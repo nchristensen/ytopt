@@ -36,7 +36,7 @@ class SubmittedFuture:
                 self._state = 'failed'
         else:
             self._state = 'active'
-        print(len(self.submitted_future.values), self.submitted_future.nvals, self._state)
+        #print(len(self.submitted_future.values), self.submitted_future.nvals, self._state)
 
     def result(self):
         if not self.done:
@@ -89,8 +89,8 @@ class ExecutorEvaluator(Evaluator):
     executor: Union[Executor, None]
     num_workers: int
 
-    def __init__(self, problem, executor, cache_key=None):
-        super().__init__(problem, cache_key)
+    def __init__(self, problem, executor, cache_key=None, output_file_base="results"):
+        super().__init__(problem, cache_key, output_file_base=output_file_base)
         self.num_workers = 1#self.WORKERS_PER_NODE
         self.executor = executor
         
@@ -162,46 +162,46 @@ class MPICommExecutorEvaluator(ExecutorEvaluator):
 
     # Assumes MPI has been initialized at some point before the constructor is called
     # Should probably add some way for it to obey maximum workers per node
-    def __init__(self, problem, cache_key=None):
+    def __init__(self, problem, cache_key=None, output_file_base="results"):
         from mpi4py.futures import MPICommExecutor
         executor = MPICommExecutor(comm=None, root=0).__enter__()   
-        super().__init__(problem, executor, cache_key)
+        super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base)
 
 
 class MPIPoolExecutorEvaluator(ExecutorEvaluator):
 
     # Assumes MPI has been initialized at some point before the constructor is called
     # Should probably add some way for it to obey maximum workers per node
-    def __init__(self, problem, cache_key=None):
+    def __init__(self, problem, cache_key=None, output_file_base="results"):
         from mpi4py.futures import MPIPoolExecutor
         executor = MPIPoolExecutor(max_workers=1) 
-        super().__init__(problem, executor, cache_key)
+        super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base)
 
 
 class ThreadPoolExecutorEvaluator(ExecutorEvaluator):
 
     # Assumes MPI has been initialized at some point before the constructor is called
     # Should probably add some way for it to obey maximum workers per node
-    def __init__(self, problem, cache_key=None):
+    def __init__(self, problem, cache_key=None, output_file_base="results"):
         executor = ThreadPoolExecutor(max_workers=1) 
-        super().__init__(problem, executor, cache_key)
+        super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base)
 
 
 class ProcessPoolExecutorEvaluator(ExecutorEvaluator):
 
     # Assumes MPI has been initialized at some point before the constructor is called
     # Should probably add some way for it to obey maximum workers per node
-    def __init__(self, problem, cache_key=None):
+    def __init__(self, problem, cache_key=None, output_file_base="results"):
         executor = ProcessPoolExecutor(max_workers=1) 
-        super().__init__(problem, executor, cache_key)
+        super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base)
 
 class Charm4pyPoolExecutorEvaluator(ExecutorEvaluator):
 
     # Assumes MPI has been initialized at some point before the constructor is called
     # Should probably add some way for it to obey maximum workers per node
-    def __init__(self, problem, cache_key=None):
+    def __init__(self, problem, cache_key=None, output_file_base="results"):
         from charm4py.pool import PoolExecutor, PoolScheduler, Pool
         from charm4py.chare import Chare
         pool_proxy = Chare(PoolScheduler, onPE=0)
         executor = PoolExecutor(pool_proxy) 
-        super().__init__(problem, executor, cache_key)
+        super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base)

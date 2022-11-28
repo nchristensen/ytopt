@@ -39,7 +39,7 @@ class Evaluator:
     PYTHON_EXE = os.environ.get('YTOPT_PYTHON_BACKEND', sys.executable)
     assert os.path.isfile(PYTHON_EXE)
     
-    def __init__(self, problem, cache_key=None):
+    def __init__(self, problem, cache_key=None, output_file_base=None):
         self.pending_evals = {}  # uid --> Future
         self.finished_evals = OrderedDict()  # uid --> scalar
         self.requested_evals = []  # keys
@@ -62,34 +62,36 @@ class Evaluator:
         else:
             self._gen_uid = lambda d: self.encode(d)
 
+        self.output_file_base = "results" if output_file_base is None else output_file_base
+        
 
     @staticmethod
-    def create(problem, cache_key=None, method='balsam', redis_address=None):
+    def create(problem, cache_key=None, output_file_base="results", method='balsam', redis_address=None):
         assert method in ['balsam', 'subprocess', 'ray', 'mpi_pool_executor', 'mpi_comm_executor', 'threadpool', 'processpool', 'charm4py_pool_executor']
         if method == "balsam":
             from ytopt.evaluator.balsam_evaluator import BalsamEvaluator
-            Eval = BalsamEvaluator(problem, cache_key=cache_key)
+            Eval = BalsamEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "subprocess":
             from ytopt.evaluator.subprocess_evaluator import SubprocessEvaluator
-            Eval = SubprocessEvaluator(problem, cache_key=cache_key)
+            Eval = SubprocessEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "ray":
             from ytopt.evaluator.ray_evaluator import RayEvaluator
-            Eval = RayEvaluator(problem, cache_key=cache_key, redis_address=redis_address)
+            Eval = RayEvaluator(problem, cache_key=cache_key, redis_address=redis_address, output_file_base=output_file_base)
         elif method == "mpi_comm_executor":
             from ytopt.evaluator.executor_evaluator import MPICommExecutorEvaluator
-            Eval = MPICommExecutorEvaluator(problem, cache_key=cache_key)
+            Eval = MPICommExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "mpi_pool_executor":
             from ytopt.evaluator.executor_evaluator import MPIPoolExecutorEvaluator
-            Eval = MPIPoolExecutorEvaluator(problem, cache_key=cache_key)
+            Eval = MPIPoolExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "threadpool":
             from ytopt.evaluator.executor_evaluator import ThreadPoolExecutorEvaluator
-            Eval = ThreadPoolExecutorEvaluator(problem, cache_key=cache_key)
+            Eval = ThreadPoolExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "processpool":
             from ytopt.evaluator.executor_evaluator import ProcessPoolExecutorEvaluator
-            Eval = ProcessPoolExecutorEvaluator(problem, cache_key=cache_key)
+            Eval = ProcessPoolExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "charm4py_pool_executor":
             from ytopt.evaluator.executor_evaluator import Charm4pyPoolExecutorEvaluator
-            Eval = Charm4pyPoolExecutorEvaluator(problem, cache_key=cache_key)
+            Eval = Charm4pyPoolExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
 
         return Eval
 
@@ -240,7 +242,7 @@ class Evaluator:
         if not self.finished_evals:
             return
 
-        with open('results.json', 'w') as fp:
+        with open(self.output_file_base + '.json', 'w') as fp:
             json.dump(self.finished_evals, fp, indent=4,
                       sort_keys=True, cls=Encoder)
 
@@ -254,7 +256,8 @@ class Evaluator:
             result['elapsed_sec'] = self.elapsed_times[uid]
             resultsList.append(result)
 
-        with open('results.csv', 'w') as fp:
+        print("WRITING TO:",self.output_file_base + '.csv') 
+        with open(self.output_file_base + '.csv', 'w') as fp:
             columns = resultsList[0].keys()
             writer = csv.DictWriter(fp, columns)
             writer.writeheader()
