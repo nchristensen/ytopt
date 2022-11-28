@@ -65,7 +65,7 @@ class Evaluator:
 
     @staticmethod
     def create(problem, cache_key=None, method='balsam', redis_address=None):
-        assert method in ['balsam', 'subprocess', 'ray']
+        assert method in ['balsam', 'subprocess', 'ray', 'mpi_pool_executor', 'mpi_comm_executor', 'threadpool', 'processpool', 'charm4py_pool_executor']
         if method == "balsam":
             from ytopt.evaluator.balsam_evaluator import BalsamEvaluator
             Eval = BalsamEvaluator(problem, cache_key=cache_key)
@@ -75,6 +75,21 @@ class Evaluator:
         elif method == "ray":
             from ytopt.evaluator.ray_evaluator import RayEvaluator
             Eval = RayEvaluator(problem, cache_key=cache_key, redis_address=redis_address)
+        elif method == "mpi_comm_executor":
+            from ytopt.evaluator.executor_evaluator import MPICommExecutorEvaluator
+            Eval = MPICommExecutorEvaluator(problem, cache_key=cache_key)
+        elif method == "mpi_pool_executor":
+            from ytopt.evaluator.executor_evaluator import MPIPoolExecutorEvaluator
+            Eval = MPIPoolExecutorEvaluator(problem, cache_key=cache_key)
+        elif method == "threadpool":
+            from ytopt.evaluator.executor_evaluator import ThreadPoolExecutorEvaluator
+            Eval = ThreadPoolExecutorEvaluator(problem, cache_key=cache_key)
+        elif method == "processpool":
+            from ytopt.evaluator.executor_evaluator import ProcessPoolExecutorEvaluator
+            Eval = ProcessPoolExecutorEvaluator(problem, cache_key=cache_key)
+        elif method == "charm4py_pool_executor":
+            from ytopt.evaluator.executor_evaluator import Charm4pyPoolExecutorEvaluator
+            Eval = Charm4pyPoolExecutorEvaluator(problem, cache_key=cache_key)
 
         return Eval
 

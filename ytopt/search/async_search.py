@@ -14,7 +14,7 @@ import argparse
 
 from skopt.acquisition import gaussian_ei, gaussian_pi, gaussian_lcb
 import numpy as np
-from ytopt.search.NeuralNetworksDropoutRegressor import NeuralNetworksDropoutRegressor
+#from ytopt.search.NeuralNetworksDropoutRegressor import NeuralNetworksDropoutRegressor
 from ytopt.search.search import Search
 from ytopt.search.utils import tags, saveResults
 seed = 1234
