@@ -99,13 +99,14 @@ class ExecutorEvaluator(Evaluator):
 
     def _eval_exec(self, x: dict):
         assert isinstance(x, dict)
-        print(type(self.executor))
+        #print(type(self.executor))
         if self.executor is not None: # Needed for MPICommExecutor
             executor_future = self.executor.submit(self.problem.objective, x)
-        print("Submitted", x)
-        evaluator_future = SubmittedFuture(executor_future)
-        return evaluator_future
-
+            print("Submitted", x)
+            evaluator_future = SubmittedFuture(executor_future)
+            return evaluator_future
+        else:
+            return None
 
     @staticmethod
     def _timer(timeout):

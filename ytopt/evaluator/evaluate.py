@@ -121,8 +121,10 @@ class Evaluator:
         else:
             future = self._eval_exec(x)
             logger.info(f"Submitted new eval of {x}")
-            future.uid = uid
-            self.pending_evals[uid] = future
+            if future is not None:
+                future.uid = uid
+                self.pending_evals[uid] = future
+                
         self.key_uid_map[key] = uid
 
     def add_eval_batch(self, XX):
