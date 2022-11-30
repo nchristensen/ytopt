@@ -166,6 +166,31 @@ class ExecutorEvaluator(Evaluator):
         if self.executor is not None:
             self.executor.shutdown(wait=False)
 
+
+class ThreadPoolExecutorEvaluator(ExecutorEvaluator):
+
+    # Assumes MPI has been initialized at some point before the constructor is called
+    # Should probably add some way for it to obey maximum workers per node
+    def __init__(self, problem, cache_key=None, output_file_base="results", num_workers=None):
+        if num_workers is None:
+            num_workers = self.WORKERS_PER_NODE
+
+        executor = ThreadPoolExecutor(max_workers=num_workers) 
+        super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base, num_workers=num_workers)
+
+
+class ProcessPoolExecutorEvaluator(ExecutorEvaluator):
+
+    # Assumes MPI has been initialized at some point before the constructor is called
+    # Should probably add some way for it to obey maximum workers per node
+    def __init__(self, problem, cache_key=None, output_file_base="results", num_workers=None):
+        if num_workers is None:
+            num_workers = self.WORKERS_PER_NODE
+        
+        executor = ProcessPoolExecutor(max_workers=num_workers) 
+        super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base, num_workers=num_workers)
+
+
 class MPICommExecutorEvaluator(ExecutorEvaluator):
 
     # Assumes MPI has been initialized at some point before the constructor is called
@@ -188,22 +213,6 @@ class MPIPoolExecutorEvaluator(ExecutorEvaluator):
         super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base)
 
 
-class ThreadPoolExecutorEvaluator(ExecutorEvaluator):
-
-    # Assumes MPI has been initialized at some point before the constructor is called
-    # Should probably add some way for it to obey maximum workers per node
-    def __init__(self, problem, cache_key=None, output_file_base="results", num_workers=None):
-        executor = ThreadPoolExecutor(max_workers=num_workers) 
-        super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base)
-
-
-class ProcessPoolExecutorEvaluator(ExecutorEvaluator):
-
-    # Assumes MPI has been initialized at some point before the constructor is called
-    # Should probably add some way for it to obey maximum workers per node
-    def __init__(self, problem, cache_key=None, output_file_base="results", num_workers=None):
-        executor = ProcessPoolExecutor(max_workers=num_workers) 
-        super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base)
 
 class Charm4pyPoolExecutorEvaluator(ExecutorEvaluator):
 
