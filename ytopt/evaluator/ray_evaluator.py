@@ -78,8 +78,8 @@ class RayEvaluator(Evaluator):
     WaitResult = namedtuple(
         'WaitResult', ['active', 'done', 'failed', 'cancelled'])
 
-    def __init__(self, problem, cache_key=None, redis_address=None):
-        super().__init__(problem, cache_key)
+    def __init__(self, problem, cache_key=None, redis_address=None, output_file_base="results"):
+        super().__init__(problem, cache_key, output_file_base=output_file_base)
 
         logger.info(f'RAY Evaluator init: redis-address={redis_address}')
 
