@@ -164,7 +164,7 @@ class ExecutorEvaluator(Evaluator):
 
     def __del__(self):
         if self.executor is not None:
-            self.executor.shutdown(wait=True)
+            self.executor.shutdown(wait=False)
 
 class MPICommExecutorEvaluator(ExecutorEvaluator):
 
@@ -177,6 +177,8 @@ class MPICommExecutorEvaluator(ExecutorEvaluator):
         comm_size = COMM_WORLD.Get_size() if comm is None else comm.Get_size()
         super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base, num_workers=comm_size - 1)
 
+    def __del__(self):
+        self.executor.__exit__()
 
 class MPIPoolExecutorEvaluator(ExecutorEvaluator):
 
