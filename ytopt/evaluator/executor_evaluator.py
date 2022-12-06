@@ -4,7 +4,7 @@ from collections import defaultdict, namedtuple
 import sys
 from concurrent.futures import Executor, ThreadPoolExecutor, ProcessPoolExecutor
 from dataclasses import dataclass
-from typing import Union
+from typing import Optional
 
 from ytopt.evaluator.evaluate import Evaluator
 
@@ -86,7 +86,7 @@ class ExecutorEvaluator(Evaluator):
     WaitResult = namedtuple(
         'WaitResult', ['active', 'done', 'failed', 'cancelled'])
     
-    executor: Union[Executor, None]
+    executor: Optional[None]
     num_workers: int
 
     def __init__(self, problem, executor, cache_key=None, output_file_base="results", num_workers=None):
@@ -94,6 +94,7 @@ class ExecutorEvaluator(Evaluator):
         self.executor = executor
         if num_workers is not None:
             self.num_workers = num_workers
+        #elif hasattr(self.executor, "_max_workers"):
         elif self.executor is not None and hasattr(self.executor, "_max_workers"):
             # Should work for MPIPoolExecutor, ThreadPool, and ProcessPool
             # Won't work for MPICommExecutor
@@ -162,10 +163,11 @@ class ExecutorEvaluator(Evaluator):
 
         return waitresult
 
-    def __del__(self):
-        if self.executor is not None:
-            self.executor.shutdown(wait=False)
-
+    def shutdown(self):
+        if hasattr(self.executor, "__exit__"):
+            self.executor.__exit__(None,None,None)
+        elif self.executor is not None:
+            self.executor.shutdown(wait=True)
 
 class ThreadPoolExecutorEvaluator(ExecutorEvaluator):
 
@@ -200,8 +202,10 @@ class MPICommExecutorEvaluator(ExecutorEvaluator):
         from mpi4py.MPI import COMM_WORLD
         executor = MPICommExecutor(comm=comm, root=0).__enter__()
         comm_size = COMM_WORLD.Get_size() if comm is None else comm.Get_size()
+        #if executor is not None:
         super().__init__(problem, executor, cache_key=cache_key, output_file_base=output_file_base, num_workers=comm_size - 1)
-
+        #else:
+        #    self = None
 
 class MPIPoolExecutorEvaluator(ExecutorEvaluator):
 

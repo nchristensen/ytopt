@@ -79,7 +79,10 @@ class Evaluator:
             Eval = RayEvaluator(problem, cache_key=cache_key, redis_address=redis_address, output_file_base=output_file_base)
         elif method == "mpi_comm_executor":
             from ytopt.evaluator.executor_evaluator import MPICommExecutorEvaluator
-            Eval = MPICommExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
+            from mpi4py.MPI import COMM_WORLD
+            Eval = None
+            if True:#COMM_WORLD.Get_rank() == 0:
+                Eval = MPICommExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "mpi_pool_executor":
             from ytopt.evaluator.executor_evaluator import MPIPoolExecutorEvaluator
             Eval = MPIPoolExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
@@ -265,4 +268,5 @@ class Evaluator:
             writer.writeheader()
             writer.writerows(resultsList)
          
-            
+    def shutdown(self):
+        pass

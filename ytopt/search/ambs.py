@@ -91,34 +91,37 @@ class AMBS(Search):
         return parser
 
     def main(self):
-        timer = util.DelayTimer(max_minutes=None, period=SERVICE_PERIOD)
-        chkpoint_counter = 0
-        num_evals = 0
 
         logger.info(f"Generating {self.num_workers} initial points...")
         XX = self.optimizer.ask_initial(n_points=self.num_workers)
-        self.evaluator.add_eval_batch(XX)
 
-        # MAIN LOOP
-        for elapsed_str in timer:
-            logger.info(f"Elapsed time: {elapsed_str}")
-            results = list(self.evaluator.get_finished_evals())
-            num_evals += len(results)
-            chkpoint_counter += len(results)
-            if EXIT_FLAG or num_evals >= self.max_evals:
-                break
-            if results:
-                logger.info(f"Refitting model with batch of {len(results)} evals")
-                self.optimizer.tell(results)
-                logger.info(f"Drawing {len(results)} points with strategy {self.optimizer.liar_strategy}")
-                for batch in self.optimizer.ask(n_points=len(results)):
-                    self.evaluator.add_eval_batch(batch)
-            if chkpoint_counter >= CHECKPOINT_INTERVAL:
-                self.evaluator.dump_evals()
-                chkpoint_counter = 0
+        if not hasattr(self.evaluator, "executor") or self.evaluator.executor is not None:
+            timer = util.DelayTimer(max_minutes=None, period=SERVICE_PERIOD)
+            chkpoint_counter = 0
+            num_evals = 0
 
-        logger.info('Hyperopt driver finishing')
-        self.evaluator.dump_evals()
+            self.evaluator.add_eval_batch(XX)
+            # MAIN LOOP
+            for elapsed_str in timer:
+                logger.info(f"Elapsed time: {elapsed_str}")
+                results = list(self.evaluator.get_finished_evals())
+                num_evals += len(results)
+                chkpoint_counter += len(results)
+                if EXIT_FLAG or num_evals >= self.max_evals:
+                    break
+                if results:
+                    logger.info(f"Refitting model with batch of {len(results)} evals")
+                    self.optimizer.tell(results)
+                    logger.info(f"Drawing {len(results)} points with strategy {self.optimizer.liar_strategy}")
+                    for batch in self.optimizer.ask(n_points=len(results)):
+                        self.evaluator.add_eval_batch(batch)
+                if chkpoint_counter >= CHECKPOINT_INTERVAL:
+                    self.evaluator.dump_evals()
+                    chkpoint_counter = 0
+
+            logger.info('Hyperopt driver finishing')
+            self.evaluator.dump_evals()
+            self.evaluator.shutdown()
 
 if __name__ == "__main__":
     args = AMBS.parse_args()
