@@ -100,11 +100,8 @@ class Evaluator:
                 output_file_base=output_file_base)
         elif method == "mpi_comm_executor":
             from ytopt.evaluator.executor_evaluator import MPICommExecutorEvaluator
-            from mpi4py.MPI import COMM_WORLD
-            Eval = None
-            if True:  # COMM_WORLD.Get_rank() == 0:
-                Eval = MPICommExecutorEvaluator(
-                    problem, cache_key=cache_key, output_file_base=output_file_base)
+            Eval = MPICommExecutorEvaluator(
+                problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "mpi_pool_executor":
             from ytopt.evaluator.executor_evaluator import MPIPoolExecutorEvaluator
             Eval = MPIPoolExecutorEvaluator(
