@@ -13,16 +13,22 @@ try:
     ccs_active = True
 except (ImportError, OSError) as a:
     import warnings
-    warnings.warn("CCS could not be loaded and is deactivated: " + str(a), category=ImportWarning)
+    warnings.warn(
+        "CCS could not be loaded and is deactivated: " +
+        str(a),
+        category=ImportWarning)
 
 logger = util.conf_logger('ytopt.search.hps.optimizer.optimizer')
+
 
 class Optimizer:
     SEED = 12345
     KAPPA = 1.96
 
-    def __init__(self, num_workers: int, space, learner, acq_func, liar_strategy, set_KAPPA, set_SEED, set_NI, **kwargs):
-        assert learner in ["RF", "ET", "GBRT", "GP", "DUMMY"], f"Unknown scikit-optimize base_estimator: {learner}"
+    def __init__(self, num_workers: int, space, learner, acq_func, liar_strategy,
+                 set_KAPPA, set_SEED, set_NI, initial_observations=None, **kwargs):
+        assert learner in ["RF", "ET", "GBRT", "GP",
+                           "DUMMY"], f"Unknown scikit-optimize base_estimator: {learner}"
         assert liar_strategy in "cl_min cl_mean cl_max".split()
 
         self.space = space
@@ -30,40 +36,48 @@ class Optimizer:
         self.acq_func = acq_func
         self.liar_strategy = liar_strategy
         self.KAPPA = set_KAPPA
-        self.SEED  = set_SEED
-        self.NI    = set_NI
-#         n_init = set_NI 
+        self.SEED = set_SEED
+        self.NI = set_NI
+#         n_init = set_NI
 #         print ('............self.KAPPA',self.KAPPA)
 #         print ('............self.learner',self.learner)
 #         print ('............self.acq_func',self.acq_func)
 #         print ('............self.SEED',self.SEED)
 
-        n_init = inf if learner=='DUMMY' else self.NI #num_workers
-#         print ('............n_init',n_init)        
-        if isinstance(self.space, CS.ConfigurationSpace) or (ccs_active and isinstance(self.space, CCS.ConfigurationSpace)):
+        n_init = inf if learner == 'DUMMY' else self.NI  # num_workers
+#         print ('............n_init',n_init)
+        if isinstance(self.space, CS.ConfigurationSpace) or (
+                ccs_active and isinstance(self.space, CCS.ConfigurationSpace)):
             self._optimizer = SkOptimizer(
                 dimensions=self.space,
                 base_estimator=self.learner,
                 acq_optimizer='sampling',
                 acq_func=self.acq_func,
-                acq_func_kwargs={'kappa':self.KAPPA},
+                acq_func_kwargs={'kappa': self.KAPPA},
                 random_state=self.SEED,
                 n_initial_points=n_init
             )
         else:
-             self._optimizer = SkOptimizer(
+            self._optimizer = SkOptimizer(
                 dimensions=self.space.dimensions,
                 base_estimator=self.learner,
                 acq_optimizer='sampling',
                 acq_func=self.acq_func,
-                acq_func_kwargs={'kappa':self.KAPPA},
+                acq_func_kwargs={'kappa': self.KAPPA},
                 random_state=self.SEED,
                 n_initial_points=n_init
-            )           
+            )
 
         self.evals = {}
         self.counter = 0
-        logger.info("Using skopt.Optimizer with %s base_estimator" % self.learner)
+
+        if initial_observations is None:
+            initial_observations = []
+        self.tell(initial_observations, require_requested=False)
+
+        logger.info(
+            "Using skopt.Optimizer with %s base_estimator" %
+            self.learner)
 
     def _get_lie(self):
         if self.liar_strategy == "cl_min":
@@ -71,7 +85,7 @@ class Optimizer:
         elif self.liar_strategy == "cl_mean":
             return np.mean(self._optimizer.yi) if self._optimizer.yi else 0.0
         else:
-            return  max(self._optimizer.yi) if self._optimizer.yi else 0.0
+            return max(self._optimizer.yi) if self._optimizer.yi else 0.0
 
     def _xy_from_dict(self):
         XX = list(self.evals.keys())
@@ -83,13 +97,13 @@ class Optimizer:
             res = {}
             hps_names = self.space.get_hyperparameter_names()
             for i in range(len(x)):
-                res[hps_names[i]] = x [i]
+                res[hps_names[i]] = x[i]
             return res
         elif ccs_active and isinstance(self.space, CCS.ConfigurationSpace):
             res = {}
             hps = self.space.hyperparameters
             for i in range(len(x)):
-                res[hps[i].name] = x [i]
+                res[hps[i].name] = x[i]
             return res
         else:
             return self.space.to_dict(x)
@@ -100,7 +114,7 @@ class Optimizer:
         key = tuple(x)
         if key not in self.evals:
             self.counter += 1
-            self._optimizer.tell(x,y)
+            self._optimizer.tell(x, y)
             self.evals[key] = y
             logger.debug(f'_ask: {x} lie: {y}')
         else:
@@ -133,16 +147,20 @@ class Optimizer:
             key = tuple(x)
             if key not in self.evals:
                 self.counter += 1
-                self._optimizer.tell(x,y)
+                self._optimizer.tell(x, y)
                 self.evals[key] = y
         return [self.to_dict(x) for x in XX]
 
-    def tell(self, xy_data):
-        assert isinstance(xy_data, list), f"where type(xy_data)=={type(xy_data)}"
+    def tell(self, xy_data, require_requested=True):
+        assert isinstance(
+            xy_data, list), f"where type(xy_data)=={type(xy_data)}"
         maxval = max(self._optimizer.yi) if self._optimizer.yi else 0.0
-        for x,y in xy_data:
-            key = tuple(x.values()) # * tuple(x[k] for k in self.space)
-            assert key in self.evals, f"where key=={key} and self.evals=={self.evals}"
+        for x, y in xy_data:
+            key = tuple(x.values())  # * tuple(x[k] for k in self.space)
+            if require_requested:
+                assert key in self.evals, f"where key=={key} and self.evals=={self.evals}"
+            else:
+                self.counter += 1
             logger.debug(f'tell: {x} --> {key}: evaluated objective: {y}')
             self.evals[key] = (y if y < float_info.max else maxval)
 
