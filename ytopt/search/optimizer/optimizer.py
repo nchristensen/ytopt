@@ -26,7 +26,7 @@ class Optimizer:
     KAPPA = 1.96
 
     def __init__(self, num_workers: int, space, learner, acq_func, liar_strategy,
-                 set_KAPPA, set_SEED, set_NI, initial_observations=None, **kwargs):
+                 set_KAPPA, set_SEED, set_NI, initial_observations=[], **kwargs):
         assert learner in ["RF", "ET", "GBRT", "GP",
                            "DUMMY"], f"Unknown scikit-optimize base_estimator: {learner}"
         assert liar_strategy in "cl_min cl_mean cl_max".split()
@@ -71,9 +71,8 @@ class Optimizer:
         self.evals = {}
         self.counter = 0
 
-        if initial_observations is None:
-            initial_observations = []
-        self.tell(initial_observations, require_requested=False)
+        if len(initial_observations) > 0:
+            self.tell(initial_observations, require_requested=False)
 
         logger.info(
             "Using skopt.Optimizer with %s base_estimator" %
