@@ -32,7 +32,7 @@ from ytopt.search import util
 
 logger = util.conf_logger('ytopt.search.hps.ambs')
 
-SERVICE_PERIOD = 0          # Delay (seconds) between main loop iterations
+SERVICE_PERIOD = 2          # Delay (seconds) between main loop iterations
 CHECKPOINT_INTERVAL = 1    # How many jobs to complete between optimizer checkpoints
 EXIT_FLAG = False
 
