@@ -15,10 +15,12 @@ import re
 from ytopt.evaluator import runner
 logger = logging.getLogger(__name__)
 
+
 class Encoder(json.JSONEncoder):
     """
     Enables JSON dump of numpy data
     """
+
     def default(self, obj):
         if isinstance(obj, uuid.UUID):
             return obj.hex
@@ -33,12 +35,13 @@ class Encoder(json.JSONEncoder):
         else:
             return super(Encoder, self).default(obj)
 
+
 class Evaluator:
     FAIL_RETURN_VALUE = sys.float_info.max
     WORKERS_PER_NODE = int(os.environ.get('YTOPT_WORKERS_PER_NODE', 1))
     PYTHON_EXE = os.environ.get('YTOPT_PYTHON_BACKEND', sys.executable)
     assert os.path.isfile(PYTHON_EXE)
-    
+
     def __init__(self, problem, cache_key=None, output_file_base=None):
         self.pending_evals = {}  # uid --> Future
         self.finished_evals = OrderedDict()  # uid --> scalar
@@ -63,38 +66,60 @@ class Evaluator:
             self._gen_uid = lambda d: self.encode(d)
 
         self.output_file_base = "results" if output_file_base is None else output_file_base
-        
 
     @staticmethod
-    def create(problem, cache_key=None, output_file_base="results", method='balsam', redis_address=None):
-        assert method in ['balsam', 'subprocess', 'ray', 'mpi_pool_executor', 'mpi_comm_executor', 'threadpool', 'processpool', 'charm4py_pool_executor']
+    def create(problem, cache_key=None, output_file_base="results",
+               method='balsam', redis_address=None):
+        assert method in [
+            'balsam',
+            'subprocess',
+            'ray',
+            'mpi_pool_executor',
+            'mpi_comm_executor',
+            'threadpool',
+            'processpool',
+            'charm4py_pool_executor']
         if method == "balsam":
             from ytopt.evaluator.balsam_evaluator import BalsamEvaluator
-            Eval = BalsamEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
+            Eval = BalsamEvaluator(
+                problem,
+                cache_key=cache_key,
+                output_file_base=output_file_base)
         elif method == "subprocess":
             from ytopt.evaluator.subprocess_evaluator import SubprocessEvaluator
-            Eval = SubprocessEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
+            Eval = SubprocessEvaluator(
+                problem,
+                cache_key=cache_key,
+                output_file_base=output_file_base)
         elif method == "ray":
             from ytopt.evaluator.ray_evaluator import RayEvaluator
-            Eval = RayEvaluator(problem, cache_key=cache_key, redis_address=redis_address, output_file_base=output_file_base)
+            Eval = RayEvaluator(
+                problem,
+                cache_key=cache_key,
+                redis_address=redis_address,
+                output_file_base=output_file_base)
         elif method == "mpi_comm_executor":
             from ytopt.evaluator.executor_evaluator import MPICommExecutorEvaluator
-            Eval = MPICommExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
+            Eval = MPICommExecutorEvaluator(
+                problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "mpi_pool_executor":
             from ytopt.evaluator.executor_evaluator import MPIPoolExecutorEvaluator
-            Eval = MPIPoolExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
+            Eval = MPIPoolExecutorEvaluator(
+                problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "threadpool":
             from ytopt.evaluator.executor_evaluator import ThreadPoolExecutorEvaluator
-            Eval = ThreadPoolExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
+            Eval = ThreadPoolExecutorEvaluator(
+                problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "processpool":
             from ytopt.evaluator.executor_evaluator import ProcessPoolExecutorEvaluator
-            Eval = ProcessPoolExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
+            Eval = ProcessPoolExecutorEvaluator(
+                problem, cache_key=cache_key, output_file_base=output_file_base)
         elif method == "charm4py_pool_executor":
             from ytopt.evaluator.executor_evaluator import Charm4pyPoolExecutorEvaluator
-            Eval = Charm4pyPoolExecutorEvaluator(problem, cache_key=cache_key, output_file_base=output_file_base)
+            Eval = Charm4pyPoolExecutorEvaluator(
+                problem, cache_key=cache_key, output_file_base=output_file_base)
 
         return Eval
-
 
     def encode(self, x):
         if not isinstance(x, dict):
@@ -124,7 +149,7 @@ class Evaluator:
             if future is not None:
                 future.uid = uid
                 self.pending_evals[uid] = future
-                
+
         self.key_uid_map[key] = uid
 
     def add_eval_batch(self, XX):
@@ -146,13 +171,14 @@ class Evaluator:
                 try:
                     y = float(line.split()[-1])
                 except ValueError:
-                    logger.exception("Could not parse DH-OUTPUT line:\n"+line)
+                    logger.exception(
+                        "Could not parse DH-OUTPUT line:\n" + line)
                     y = sys.float_info.max
                 break
         if isnan(y):
             y = sys.float_info.max
         return y
-       
+
 #     @property
 #     def _executable(self):
 # #         print ('======',self.problem)
@@ -160,7 +186,7 @@ class Evaluator:
 
     @property
     def _runner_executable(self):
-        funcName   = self.problem.objective.__name__
+        funcName = self.problem.objective.__name__
         moduleName = self.problem.objective.__module__
         assert moduleName != '__main__'
         module = sys.modules[moduleName]
@@ -168,7 +194,7 @@ class Evaluator:
         runnerPath = os.path.abspath(runner.__file__)
         runner_exec = ' '.join((self.PYTHON_EXE, runnerPath, modulePath, moduleName,
                                 funcName))
-        return runner_exec  
+        return runner_exec
 
     def await_evals(self, to_read, timeout=None):
         """Waiting for a collection of tasks.
@@ -189,7 +215,8 @@ class Evaluator:
         logger.info(f'Blocking on completion of {len(futures)} pending evals')
         self.wait(futures.values(), timeout=timeout,
                   return_when='ALL_COMPLETED')
-        # TODO: on TimeoutError, kill the evals that did not finish; return infinity
+        # TODO: on TimeoutError, kill the evals that did not finish; return
+        # infinity
         for uid in futures:
             y = futures[uid].result()
             self.elapsed_times[uid] = self._elapsed_sec()
@@ -197,7 +224,8 @@ class Evaluator:
             self.finished_evals[uid] = y
         for (key, uid, x) in zip(keys, uids, to_read):
             y = self.finished_evals[uid]
-            # same printing required in get_finished_evals because of logs parsing
+            # same printing required in get_finished_evals because of logs
+            # parsing
             x = self.decode(key)
             logger.info(f"Requested eval x: {x} y: {y}")
             try:
@@ -258,11 +286,12 @@ class Evaluator:
             result['elapsed_sec'] = self.elapsed_times[uid]
             resultsList.append(result)
 
-        print("WRITING TO:",self.output_file_base + '.csv') 
+        print("WRITING TO:", self.output_file_base + '.csv')
         with open(self.output_file_base + '.csv', 'w') as fp:
             columns = resultsList[0].keys()
             writer = csv.DictWriter(fp, columns)
             writer.writeheader()
             writer.writerows(resultsList)
-         
-            
+
+    def shutdown(self):
+        pass

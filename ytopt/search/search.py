@@ -27,18 +27,21 @@ class Search:
         evaluator (str): value in ['balsam', 'subprocess', 'processPool', 'threadPool'].
     """
 
-    def __init__(self, problem, evaluator, cache_key=None, max_evals=100, eval_timeout_minutes=None, redis_address=None, output_file_base="results", **kwargs):
+    def __init__(self, problem, evaluator, cache_key=None, max_evals=100,
+                 eval_timeout_minutes=None, redis_address=None, output_file_base="results", **kwargs):
         settings = kwargs
         settings['problem'] = problem
         settings['evaluator'] = evaluator
         settings['cache_key'] = cache_key
 
-
-
         self.problem = util.generic_loader(problem, 'Problem')
 
         if cache_key is None:
-            self.evaluator = Evaluator.create(self.problem, method=evaluator, output_file_base=output_file_base, redis_address=redis_address)
+            self.evaluator = Evaluator.create(
+                self.problem,
+                method=evaluator,
+                output_file_base=output_file_base,
+                redis_address=redis_address)
         else:
             self.evaluator = Evaluator.create(
                 self.problem, method=evaluator, output_file_base=output_file_base, cache_key=cache_key, redis_address=redis_address)
@@ -49,7 +52,8 @@ class Search:
         self.num_workers = self.evaluator.num_workers
 
         logger.info(f'Options: {pformat(dict(settings), indent=4)}')
-        logger.info(f'Hyperparameter space definition: {pformat(self.problem.input_space, indent=4)}')
+        logger.info(
+            f'Hyperparameter space definition: {pformat(self.problem.input_space, indent=4)}')
         logger.info(f'Created "{evaluator}" evaluator')
         logger.info(f'Evaluator: num_workers is {self.num_workers}')
 

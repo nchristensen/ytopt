@@ -36,12 +36,15 @@ SERVICE_PERIOD = 0          # Delay (seconds) between main loop iterations
 CHECKPOINT_INTERVAL = 1    # How many jobs to complete between optimizer checkpoints
 EXIT_FLAG = False
 
+
 def on_exit(signum, stack):
     global EXIT_FLAG
     EXIT_FLAG = True
 
+
 class AMBS(Search):
-    def __init__(self, learner='RF', liar_strategy='cl_max', acq_func='gp_hedge', set_KAPPA=1.96, set_SEED=12345, set_NI=10, **kwargs):
+    def __init__(self, learner='RF', liar_strategy='cl_max', acq_func='gp_hedge',
+                 set_KAPPA=1.96, set_SEED=12345, set_NI=10, initial_observations=None, **kwargs):
         super().__init__(**kwargs)
 
         logger.info("Initializing AMBS")
@@ -54,71 +57,79 @@ class AMBS(Search):
             set_KAPPA=set_KAPPA,
             set_SEED=set_SEED,
             set_NI=set_NI,
+            initial_observations=initial_observations
         )
 
     @staticmethod
     def _extend_parser(parser):
         parser.add_argument('--learner',
-            default='RF',
-            choices=["RF", "ET", "GBRT", "DUMMY", "GP"],
-            help='type of learner (surrogate model)'
-        )
+                            default='RF',
+                            choices=["RF", "ET", "GBRT", "DUMMY", "GP"],
+                            help='type of learner (surrogate model)'
+                            )
         parser.add_argument('--liar-strategy',
-            default="cl_max",
-            choices=["cl_min", "cl_mean", "cl_max"],
-            help='Constant liar strategy'
-        )
+                            default="cl_max",
+                            choices=["cl_min", "cl_mean", "cl_max"],
+                            help='Constant liar strategy'
+                            )
         parser.add_argument('--acq-func',
-            default="gp_hedge",
-            choices=["LCB", "EI", "PI","gp_hedge"],
-            help='Acquisition function type'
-        )
+                            default="gp_hedge",
+                            choices=["LCB", "EI", "PI", "gp_hedge"],
+                            help='Acquisition function type'
+                            )
         parser.add_argument('--set-KAPPA',
-            default=1.96,
-            type = float,
-            help='Acquisition function kappa'
-        )
+                            default=1.96,
+                            type=float,
+                            help='Acquisition function kappa'
+                            )
         parser.add_argument('--set-SEED',
-            default=12345,
-            type = int,
-            help='Seed random_state'
-        )
+                            default=12345,
+                            type=int,
+                            help='Seed random_state'
+                            )
         parser.add_argument('--set-NI',
-            default=10,
-            type = int,
-            help='Set n inital points'
-        )
+                            default=10,
+                            type=int,
+                            help='Set n inital points'
+                            )
         return parser
 
     def main(self):
-        timer = util.DelayTimer(max_minutes=None, period=SERVICE_PERIOD)
-        chkpoint_counter = 0
-        num_evals = 0
 
         logger.info(f"Generating {self.num_workers} initial points...")
         XX = self.optimizer.ask_initial(n_points=self.num_workers)
-        self.evaluator.add_eval_batch(XX)
 
-        # MAIN LOOP
-        for elapsed_str in timer:
-            logger.info(f"Elapsed time: {elapsed_str}")
-            results = list(self.evaluator.get_finished_evals())
-            num_evals += len(results)
-            chkpoint_counter += len(results)
-            if EXIT_FLAG or num_evals >= self.max_evals:
-                break
-            if results:
-                logger.info(f"Refitting model with batch of {len(results)} evals")
-                self.optimizer.tell(results)
-                logger.info(f"Drawing {len(results)} points with strategy {self.optimizer.liar_strategy}")
-                for batch in self.optimizer.ask(n_points=len(results)):
-                    self.evaluator.add_eval_batch(batch)
-            if chkpoint_counter >= CHECKPOINT_INTERVAL:
-                self.evaluator.dump_evals()
-                chkpoint_counter = 0
+        if not hasattr(self.evaluator,
+                       "executor") or self.evaluator.executor is not None:
+            timer = util.DelayTimer(max_minutes=None, period=SERVICE_PERIOD)
+            chkpoint_counter = 0
+            num_evals = 0
 
-        logger.info('Hyperopt driver finishing')
-        self.evaluator.dump_evals()
+            self.evaluator.add_eval_batch(XX)
+            # MAIN LOOP
+            for elapsed_str in timer:
+                logger.info(f"Elapsed time: {elapsed_str}")
+                results = list(self.evaluator.get_finished_evals())
+                num_evals += len(results)
+                chkpoint_counter += len(results)
+                if EXIT_FLAG or num_evals >= self.max_evals:
+                    break
+                if results:
+                    logger.info(
+                        f"Refitting model with batch of {len(results)} evals")
+                    self.optimizer.tell(results)
+                    logger.info(
+                        f"Drawing {len(results)} points with strategy {self.optimizer.liar_strategy}")
+                    for batch in self.optimizer.ask(n_points=len(results)):
+                        self.evaluator.add_eval_batch(batch)
+                if chkpoint_counter >= CHECKPOINT_INTERVAL:
+                    self.evaluator.dump_evals()
+                    chkpoint_counter = 0
+
+            logger.info('Hyperopt driver finishing')
+            self.evaluator.dump_evals()
+            self.evaluator.shutdown()
+
 
 if __name__ == "__main__":
     args = AMBS.parse_args()
