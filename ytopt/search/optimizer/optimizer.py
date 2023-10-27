@@ -78,6 +78,28 @@ class Optimizer:
             "Using skopt.Optimizer with %s base_estimator" %
             self.learner)
 
+    def make_key(self, key):
+        # Nan values are troublesome, but can be necessary for semantic correctness
+        # In order to guarantee that Ytopt can recognize tuples that contain nan values,
+        # EVERY nan value must be np.nan; it must explicitly NOT be represented by float('nan').
+        # This is due to the hashing semantics of __contains__() and key lookups in Ytopt's
+        # evaluations dictionary, which will differentiate two instances of float('nan') when hashing.
+        #
+        # np.nan does not have these issues and preserves the necessary semantic properties for
+        # scikit-optimize and other downstream applications to function as expected.
+        li = []
+        if not hasattr(key, '__iter__'):
+            if key != key and np.isnan(key):
+                li.append(np.nan)
+            else:
+                li.append(key)
+        else:
+            for entry in key:
+                if entry != entry and np.isnan(entry):
+                    entry = np.nan
+                li.append(entry)
+        return tuple(li)
+
     def _get_lie(self):
         if self.liar_strategy == "cl_min":
             return min(self._optimizer.yi) if self._optimizer.yi else 0.0
@@ -100,7 +122,7 @@ class Optimizer:
             return res
         elif ccs_active and isinstance(self.space, CCS.ConfigurationSpace):
             res = {}
-            hps = self.space.hyperparameters
+            ps = self.space.parameters
             for i in range(len(x)):
                 res[hps[i].name] = x[i]
             return res
@@ -110,7 +132,7 @@ class Optimizer:
     def _ask(self):
         x = self._optimizer.ask()
         y = self._get_lie()
-        key = tuple(x)
+        key = self.make_key(x)
         if key not in self.evals:
             self.counter += 1
             self._optimizer.tell(x, y)
@@ -143,7 +165,7 @@ class Optimizer:
             XX += self._optimizer.ask(n_points=n_points)
         for x in XX:
             y = self._get_lie()
-            key = tuple(x)
+            key = self.make_key(x)
             if key not in self.evals:
                 self.counter += 1
                 self._optimizer.tell(x, y)
@@ -155,11 +177,12 @@ class Optimizer:
             xy_data, list), f"where type(xy_data)=={type(xy_data)}"
         maxval = max(self._optimizer.yi) if self._optimizer.yi else 0.0
         for x, y in xy_data:
-            key = tuple(x.values())  # * tuple(x[k] for k in self.space)
+            key = self.make_key(x.values())
             if require_requested:
                 assert key in self.evals, f"where key=={key} and self.evals=={self.evals}"
             else:
                 self.counter += 1
+
             logger.debug(f'tell: {x} --> {key}: evaluated objective: {y}')
             self.evals[key] = (y if y < float_info.max else maxval)
 

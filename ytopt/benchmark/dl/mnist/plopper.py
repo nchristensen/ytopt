@@ -1,4 +1,7 @@
-import os, sys, subprocess, random
+import os
+import sys
+import subprocess
+import random
 
 class Plopper:
     def __init__(self,sourcefile,outputdir):
@@ -18,7 +21,7 @@ class Plopper:
             dictVal[p] = v
         return(dictVal)
 
-    #Replace the Markers in the source file with the corresponding Pragma values
+    #Replace the Markers in the source file with the corresponding values
     def plotValues(self, dictVal, inputfile, outputfile):
         with open(inputfile, "r") as f1:
             buf = f1.readlines()
@@ -41,37 +44,31 @@ class Plopper:
     # Function to find the execution time of the interim file, and return the execution time as cost to the search module
     def findRuntime(self, x, params):
         interimfile = ""
+        #exetime = float('inf')
+        #exetime = sys.maxsize
         exetime = 1
         counter = random.randint(1, 10001) # To reduce collision increasing the sampling intervals
-        interimfile = self.outputdir+"/"+str(counter)+".c"
+
+        interimfile = self.outputdir+"/"+str(counter)+".py"
+
 
         # Generate intermediate file
         dictVal = self.createDict(x, params)
         self.plotValues(dictVal, self.sourcefile, interimfile)
 
         #compile and find the execution time
-        tmpbinary = interimfile[:-2]
+        #tmpbinary = interimfile[:-2]
+        tmpbinary = interimfile
+
         kernel_idx = self.sourcefile.rfind('/')
         kernel_dir = self.sourcefile[:kernel_idx]
 
-        gcc_cmd = "mpicc -std=gnu99 -Wall -flto  -fopenmp -DOPENMP -DMPI -O3 "  + \
-        " -o " + tmpbinary + " " + interimfile +" " + kernel_dir + "/Materials.c " \
-        + kernel_dir + "/XSutils.c " + " -I" + kernel_dir + \
-        " -lm" + " -L${CONDA_PREFIX}/lib"
-        run_cmd = kernel_dir + "/exe.pl " +  tmpbinary
+        cmd2 = kernel_dir + "/exe.pl " +  tmpbinary
 
-        #Find the compilation status using subprocess
-        compilation_status = subprocess.run(gcc_cmd, shell=True, stderr=subprocess.PIPE)
-
-        #Find the execution time only when the compilation return code is zero, else return infinity
-        if compilation_status.returncode == 0 :
-        #and len(compilation_status.stderr) == 0: #Second condition is to check for warnings
-            execution_status = subprocess.run(run_cmd, shell=True, stdout=subprocess.PIPE)
-            exetime = float(execution_status.stdout.decode('utf-8'))
-            if exetime == 0:
-                exetime = 1
-        else:
-            print(compilation_status.stderr)
-            print("compile failed")
+        #Find the execution time 
+        execution_status = subprocess.run(cmd2, shell=True, stdout=subprocess.PIPE)
+        exetime = float(execution_status.stdout.decode('utf-8'))
+        if exetime == 0:
+           exetime = -1
         return exetime #return execution time as cost
 

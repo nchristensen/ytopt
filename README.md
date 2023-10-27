@@ -5,40 +5,37 @@
 <!-- [![Documentation Status](https://readthedocs.org/projects/ytopt/badge/?version=latest)](https://ytopt.readthedocs.io/en/latest/?badge=latest)-->
 
 # What is ytopt?
-``ytopt`` is a machine-learning-based search software package that consists of sampling a small number of input parameter configurations, evaluating them, and progressively fitting a surrogate model over the input-output space until exhausting the user-defined time or the maximum number of evaluations. The package is built based on Bayesian Optimization that solves any optimization problem and is especially useful when the objective function is difficult to evaluate. It provides an interface that deals with unconstrained and constrained problems. The software is designed to operate in the manager-worker computational paradigm, where one manager node fits the surrogate model and generates promising input configurations and worker nodes perform the computationally expensive evaluations and return the outputs to the manager node. The asynchronous aspect of the search allows the search to avoid waiting for all the evaluation results before proceeding to the next iteration. As soon as an evaluation is finished, the data is used to retrain the surrogate model, which is then used to bias the search toward the promising configurations. 
 
-<!--
-``ytopt`` is a machine-learning-based search software package that consists of sampling a small number of input parameter configurations,
-evaluating them, and progressively fitting a surrogate model over the input-output space until exhausting the user-defined time or maximum number of 
-evaluations. The package provides two different class of methods: Bayesian Optimization and Reinforcement Learning.
-The software is designed to operate in the manager-worker computational paradigm, where one manager node fits 
-the surrogate model and generates promising input configurations and worker nodes perform the computationally expensive evaluations and 
-return the outputs to the manager node.
-The asynchronous aspect of the search allows the search to avoid waiting for all the evaluation results before proceeding to the next iteration. As 
-soon as an evaluation is finished, the data is used to retrain the surrogate model, which is then used to bias the search toward the promising configurations. -->
-# Directory structure
-```
-docs/	
-    Sphinx documentation files
-test/
-    scipts for running benchmark problems in the problems directory
-ytopt/	
-    scripts that contain the search implementations  
-ytopt/benchmark/	
-    a set of problems the user can use to compare our different search algorithms or as examples to build their own problems
-```
+
+
+``ytopt`` is a machine learning-based autotuning software package that uses Bayesian Optimization to find the best input parameter configurations for a given kernel, miniapp, or application with the best system configurations for a given HPC system.
+
+``ytopt`` accepts as input:
+
+  1. A code-evaluation wrapper for performance measurement
+  2. Tunable system parameters
+  3. The corresponding parameter search space
+
+By sampling and evaluating a small number of input configurations, ``ytopt`` gradually builds a surrogate model of the input-output space. This process continues until the user-specified time or the maximum number of evaluations is reached.
+
+``ytopt`` handles both unconstrained and constrained optimization problems, searches asynchronously, and can look-ahead on iterations to more effectively adapt to new evaluations and adjust the search towards promising configurations, leading to a more efficient and faster convergence on the best solutions.
+
+Internally, ``ytopt`` uses a manager-worker computational paradigm, where one node fits the surrogate model and generates new input configurations, and other nodes perform the computationally expensive evaluations and return the results to the manager node.
+
+Additional documentation is available on [Read the Docs](https://ytopt.readthedocs.io/en/latest/).
 
 # Install instructions
-The autotuning framework requires the following components: ConfigSpace, CConfigSpace (optional), scikit-optimize, autotune, and ytopt.
+``ytopt`` requires the following components: ``ConfigSpace``, CConfigSpace (optional), ``dh-scikit-optimize``, and ``autotune``.
+
 
 * We recommend creating isolated Python environments on your local machine using [conda](https://docs.conda.io/projects/conda/en/latest/index.html), for example:
 
 ```
-conda create --name ytune python=3.7
+conda create --name ytune python=3.10
 conda activate ytune
 ```
 
-* Create a directory for ytopt tutorial as follows:
+* Create a directory for ``ytopt``:
 ```
 mkdir ytopt
 cd ytopt
@@ -52,7 +49,7 @@ pip install -e .
 cd ..
 ```
 
-* Install [scikit-optimize](https://github.com/ytopt-team/scikit-optimize.git):
+* Install [dh-scikit-optimize](https://github.com/ytopt-team/scikit-optimize.git):
 ```
 git clone https://github.com/ytopt-team/scikit-optimize.git
 cd scikit-optimize
@@ -75,7 +72,9 @@ cd ytopt
 pip install -e .
 ```
 
-* If needed, downgrade the protobuf package to 3.20.x or lower
+After installing ConfigSpace, Scikit-optimize, autotune, and ytopt successfully, the autotuning framework ytopt is ready to use.
+
+* If needed, downgrade the ``protobuf`` package to 3.20.x or lower
 ```
 pip install protobuf==3.20
 ```
@@ -84,7 +83,19 @@ pip install protobuf==3.20
 pip install packaging
 ```
 
-* If you encounter installtion error, install psutil, setproctitle, mpich, mpi4py first as follows:
+* If needed, uninstall scikit-optimize to prevent import confusion with dh-scikit-optimize
+```
+pip uninstall scikit-optimize
+```
+
+* If you encounter installation error about the package grpcio (1.51.1), just install its old version, it should work.
+```
+pip install grpcio==1.43.0
+```
+
+
+* If you encounter installation errors, install psutil, setproctitle, mpich, mpi4py first as follows:
+
 ```
 conda install -c conda-forge psutil
 conda install -c conda-forge setproctitle
@@ -93,8 +104,8 @@ conda install -c conda-forge mpi4py
 pip install -e .
 ```
 
-* [Optinal] Install [CConfigSpace](https://github.com/argonne-lcf/CCS.git):
-    * Prerequisites: `autotools` and the `gsl`
+* [Optional] Install [CConfigSpace](https://github.com/argonne-lcf/CCS.git):
+    * Prerequisites: ``autotools`` and ``gsl``
         * Ubuntu
           ```
           sudo apt-get install autoconf automake libtool libgsl-dev
@@ -130,7 +141,7 @@ pip install -e .
       `libcconfigspace.so` file on Linux or to the installed `libcconfigspace.dylib`
       on MacOS. 
 
-* [Optinal] Install Online tuning:
+* [Optional] Install Online tuning:
     * Online tuning with transfer learning interface is built on Synthetic Data Vault (SDV):
     * Install [SDV](https://github.com/sdv-dev/SDV.git):
       ```
@@ -138,6 +149,39 @@ pip install -e .
       pip install -e .[online]
       ```
     * For macOS it may need to do: ``pip install -e ".[online]"``  
+
+# Directory structure
+```
+docs/
+    Sphinx documentation files
+test/
+    scipts for running benchmark problems in the problems directory
+ytopt/
+    scripts that contain the search implementations
+ytopt/benchmark/
+    a set of problems the user can use to compare our different search algorithms or as examples to build their own problems
+```
+
+# Basic Usage
+
+``ytopt`` is typically run from the command-line in the following example manner:
+
+``python -m ytopt.search.ambs --evaluator ray --problem problem.Problem --max-evals=10 --learner RF``
+
+Where:
+  * The *search* variant is one of ``ambs`` (*Asynchronous Model-Based Search*) or ``async_search`` (run as an MPI process).
+  * The *evaluator* is the method of concurrent evaluations, and can be ``ray`` or ``subprocess``.
+  * The *problem* is typically an ``autotune.TuningProblem`` instance. Specify the module path and instance name.
+  * ``--max-evals`` is the maximum number of evaluations.
+
+Depending on the *search* variant chosen, other command-line options may be provided. For example, the ``ytopt.search.ambs`` search
+method above was further customized by specifying the ``RF`` learning strategy.
+
+See the [``autotune`` docs](https://github.com/ytopt-team/autotune) for basic information on getting started with creating a ``TuningProblem`` instance.
+
+See the [``ConfigSpace`` docs](https://automl.github.io/ConfigSpace/main/) for guidance on defining input/output parameter spaces for problems.
+
+Otherwise, browse the ``ytopt/benchmark`` directory for an extensive collection of examples, or access [ytopt-libensemble](https://github.com/ytopt-team/ytopt-libensemble) for the latest examples with new features.
 
 # Tutorials
 
@@ -160,7 +204,7 @@ pip install -e .
 
 The core ``ytopt`` team is at Argonne National Laboratory:
 
-* Prasanna Balaprakash <pbalapra@anl.gov>, Lead and founder
+* Prasanna Balaprakash <pbalapra@anl.gov>
 * Romain Egele <regele@anl.gov>
 * Paul Hovland <hovland@anl.gov>
 * Xingfu Wu <xingfu.wu@anl.gov>
@@ -191,18 +235,17 @@ list above.
 The ytopt team uses git-flow to organize the development: [Git-Flow cheatsheet](https://danielkummer.github.io/git-flow-cheatsheet/). For tests we are using: [Pytest](https://docs.pytest.org/en/latest/). -->
 
 # Publications
-* J. Koo, P. Balaprakash, M. Kruse, X. Wu, P. Hovland, and M. Hall, "Customized Monte Carlo Tree Search for LLVM/Polly's Composable Loop Optimization Transformations," in Proceedings of 12th IEEE International Workshop on Performance Modeling, Benchmarking and Simulation of High Performance Computer Systems (PMBS21), pages 82–93, 2021. DOI: [10.1109/PMBS54543.2021.00015](https://scwpub21:conf21%2f%2f@conferences.computer.org/scwpub/pdfs/PMBS2021-vSqRXl4nJSV5KT4jWO5cW/111800a082/111800a082.pdf)
+* T. Randall, J. Koo, B. Videau, M. Kruse, X. Wu, P. Hovland, M. Hall, R. Ge, and P. Balaprakash. "Transfer-Learning-Based Autotuning Using Gaussian Copula". In 2023 International Conference on Supercomputing (ICS ’23), June 21–23, 2023, Orlando, FL, USA. ACM, New York, NY, USA, 13 pages. https://doi.org/10.1145/3577193.3593712.
+* X. Wu, P. Balaprakash, M. Kruse, J. Koo, B. Videau, P. Hovland, V. Taylor, B. Geltz, S. Jana, and M. Hall, "ytopt: Autotuning Scientific Applications for Energy Efficiency at Large Scales", Cray User Group Conference 2023 (CUG’23), Helsinki, Finland, May 7-11, 2023. DOI: [10.48550/arXiv.2303.16245](https://doi.org/10.48550/arXiv.2303.16245)
 * X. Wu, M. Kruse, P. Balaprakash, H. Finkel, P. Hovland, V. Taylor, and M. Hall, "Autotuning PolyBench benchmarks with LLVM Clang/Polly loop optimization pragmas using Bayesian optimization (extended version)," Concurrency and Computation. Practice and Experience, Volume 34, Issue 20, 2022. ISSN 1532-0626 DOI: [10.1002/cpe.6683](https://doi.org/10.1002/cpe.6683) 
+* J. Koo, P. Balaprakash, M. Kruse, X. Wu, P. Hovland, and M. Hall, "Customized Monte Carlo Tree Search for LLVM/Polly's Composable Loop Optimization Transformations," in Proceedings of 12th IEEE International Workshop on Performance Modeling, Benchmarking and Simulation of High Performance Computer Systems (PMBS21), pages 82–93, 2021. DOI: [10.1109/PMBS54543.2021.00015](https://scwpub21:conf21%2f%2f@conferences.computer.org/scwpub/pdfs/PMBS2021-vSqRXl4nJSV5KT4jWO5cW/111800a082/111800a082.pdf)
 * X. Wu, M. Kruse, P. Balaprakash, H. Finkel, P. Hovland, V. Taylor, and M. Hall, "Autotuning PolyBench Benchmarks with LLVM Clang/Polly Loop Optimization Pragmas Using Bayesian Optimization," in Proceedings of 11th IEEE International Workshop on Performance Modeling, Benchmarking and Simulation of High Performance Computer Systems (PMBS20), pages 61–70, 2020. DOI: [10.1109/PMBS51919.2020.00012](https://ieeexplore.ieee.org/document/9307884) 
 * P. Balaprakash, J. Dongarra, T. Gamblin, M. Hall, J. K. Hollingsworth, B. Norris, and R. Vuduc, "Autotuning in High-Performance Computing Applications," Proceedings of the IEEE, vol. 106, no. 11, 2018. DOI: [10.1109/JPROC.2018.2841200](https://ieeexplore.ieee.org/document/8423171) 
 *  T. Nelson, A. Rivera, P. Balaprakash, M. Hall, P. Hovland, E. Jessup, and B. Norris, "Generating efficient tensor contractions for GPUs," in Proceedings of 44th International Conference on Parallel Processing, pages 969–978, 2015. DOI: [10.1109/ICPP.2015.106](https://ieeexplore.ieee.org/document/7349652) 
 
 # Acknowledgements
-
-* YTune: Autotuning Compiler Technology for Cross-Architecture Transformation and Code Generation, U.S. Department of Energy Exascale Computing Project (2017--Present) 
-* Scalable Data-Efficient Learning for Scientific Domains, U.S. Department of Energy 2018 Early Career Award funded by the Advanced Scientific Computing Research program within the DOE Office of Science (2018--Present)
 * PROTEAS-TUNE, U.S. Department of Energy ASCR Exascale Computing Project (2018--Present)
+* YTune: Autotuning Compiler Technology for Cross-Architecture Transformation and Code Generation, U.S. Department of Energy Exascale Computing Project (2016--2018) 
+* Scalable Data-Efficient Learning for Scientific Domains, U.S. Department of Energy 2018 Early Career Award funded by the Advanced Scientific Computing Research program within the DOE Office of Science (2018--Present)
 
-# Copyright and license
 
-TBD

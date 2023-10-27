@@ -69,23 +69,18 @@ class Evaluator:
 
     @staticmethod
     def create(problem, cache_key=None, output_file_base="results",
-               method='balsam', redis_address=None):
-        assert method in [
-            'balsam',
+               method='ray', redis_address=None):
+
+        assert method in {
             'subprocess',
             'ray',
             'mpi_pool_executor',
             'mpi_comm_executor',
             'threadpool',
             'processpool',
-            'charm4py_pool_executor']
-        if method == "balsam":
-            from ytopt.evaluator.balsam_evaluator import BalsamEvaluator
-            Eval = BalsamEvaluator(
-                problem,
-                cache_key=cache_key,
-                output_file_base=output_file_base)
-        elif method == "subprocess":
+            'charm4py_pool_executor'}
+
+        if method == "subprocess":
             from ytopt.evaluator.subprocess_evaluator import SubprocessEvaluator
             Eval = SubprocessEvaluator(
                 problem,

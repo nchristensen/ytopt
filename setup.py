@@ -27,16 +27,16 @@ REQUIRED = [
     # 'requests', 'maya', 'records',
     'numpy',
     #'scikit-optimize',
-    'scikit-learn>=1.0.0',
+    'scikit-learn==1.0.2',
+    'pandas==1.5.3',
     'tqdm',
     'pandas==1.5.3',
     #'tensorflow==1.14.0',
     #'keras',
     # nas
     #'gym',
-    'joblib',
     'deap',
-    'ray[debug]',
+    'ray',
     #'ConfigSpace',
 ]
 
