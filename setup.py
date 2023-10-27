@@ -30,7 +30,6 @@ REQUIRED = [
     'scikit-learn==1.0.2',
     'pandas==1.5.3',
     'tqdm',
-    'pandas==1.5.3',
     #'tensorflow==1.14.0',
     #'keras',
     # nas
