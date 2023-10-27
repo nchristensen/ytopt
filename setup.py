@@ -27,7 +27,8 @@ REQUIRED = [
     # 'requests', 'maya', 'records',
     'numpy',
     #'scikit-optimize',
-    'scikit-learn==1.0.2',
+    'scikit-learn', # Having trouble installing 1.0.2
+    #'scikit-learn==1.0.2',
     'pandas==1.5.3',
     'tqdm',
     #'tensorflow==1.14.0',
