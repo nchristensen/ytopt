@@ -176,6 +176,8 @@ class LibEnsembleAMBS(AMBS):
         self.libE_specs = libE_specs if libE_specs is not None else {}
         #assert "nworkers" in libE_specs # For mpi, this can be set from the communicator
         #assert 
+        import mpi4py.MPI as MPI
+        libE_specs["nworkers"] = MPI.COMM_WORLD.Get_size() # Should be more portable. Not necessarily executing with MPI
         self.num_sim_workers = libE_specs["nworkers"] - 1
         #self.is_manager = is_manager
         self.output_file_base = kwargs["output_file_base"] if "output_file_base" in kwargs else "./results"
