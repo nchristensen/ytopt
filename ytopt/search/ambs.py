@@ -368,6 +368,10 @@ class LibEnsembleAMBS(AMBS):
         calc_in = None
         first_call = True
         first_write = True
+        from os.path import exists
+        if exists("../../../" + self.output_file_base + '.csv'):
+            first_write = False
+
         fields = [i[0] for i in gen_specs['out']]
 
         # Send batches until manager sends stop tag
@@ -411,6 +415,7 @@ class LibEnsembleAMBS(AMBS):
                         except: 
                             b += [str(entry)]
 
+ 
                     with open("../../../" + self.output_file_base + '.csv', 'a') as f:
                     #with open('../../results.csv', 'a') as f:
                         if first_write:
