@@ -176,15 +176,25 @@ class Optimizer:
         assert isinstance(
             xy_data, list), f"where type(xy_data)=={type(xy_data)}"
         maxval = max(self._optimizer.yi) if self._optimizer.yi else 0.0
+        key_count = {}
         for x, y in xy_data:
             key = self.make_key(x.values())
             if require_requested:
                 assert key in self.evals, f"where key=={key} and self.evals=={self.evals}"
             else:
-                self.counter += 1
-
-            logger.debug(f'tell: {x} --> {key}: evaluated objective: {y}')
-            self.evals[key] = (y if y < float_info.max else maxval)
+                logger.debug(f'tell: {x} --> {key}: evaluated objective: {y}')
+                if key in key_count:
+                    key_count[key] += 1
+                    logger.debug(f'{x} already present, using arithmetic average')
+                    self.evals[key] = ((key_count[key]-1)*self.evals[key] + (y if y < float_info.max else maxval))/key_count[key]
+                else:
+                    self.counter += 1
+                    key_count[key] = 1
+                    self.evals[key] = (y if y < float_info.max else maxval)
+            #else:
+            #    self.counter += 1
+            #    logger.debug(f'tell: {x} --> {key}: evaluated objective: {y}')
+            #    self.evals[key] = (y if y < float_info.max else maxval)
 
         self._optimizer.Xi = []
         self._optimizer.yi = []

@@ -134,6 +134,16 @@ class AMBS(Search):
 from autotune import TuningProblem # Is an entire new class necessary?
 class LibEnsembleTuningProblem(TuningProblem):
 
+    def __init__(self, *args, **kwargs):
+        if "wrapper_script" in kwargs:
+            self.wrapper_script = kwargs["wrapper_script"]
+            del kwargs["wrapper_script"]
+        else:
+            self.wrapper_script = None
+
+        super().__init__(*args, **kwargs)    
+
+
     def libE_objective(self, H, persis_info, sim_specs, libE_info):
         import numpy as np
         import time
@@ -145,7 +155,55 @@ class LibEnsembleTuningProblem(TuningProblem):
         for field in sim_specs['in']:
             point[field] = np.squeeze(H[field])
 
-        y = self.objective(point)#, sim_specs['in'], libE_info['workerID'])  # ytopt objective wants a dict
+        if self.wrapper_script is None:
+            y = self.objective(point)#, sim_specs['in'], libE_info['workerID'])  # ytopt objective wants a dict
+        else:
+
+            # Allows for running the objective function in a separate python process to
+            # protect the main process from crashes. Currently, all data is between the
+            # called script and the calling script through shared memory. The called script must accept the
+            # shared memory name as its single argument.
+
+            from multiprocessing import shared_memory
+            from pickle import dumps, loads
+            import feintune
+            import os
+
+            # Need to send rank/worker id to executor
+            import mpi4py.MPI as MPI
+            worker_id = MPI.COMM_WORLD.Get_rank() # Should be more portable. Not necessarily executing with MPI
+
+            pickled_data = dumps([self.objective, point, worker_id])
+
+            sh_mem = shared_memory.SharedMemory(create=True, size=len(pickled_data))
+            sh_mem.buf[:] = pickled_data[:]
+
+            #dirname = os.path.dirname(feintune.__file__)
+            #f = os.path.join(dirname, "ytopt_autotuning.py")
+
+
+            # Run the script using the executor
+            executor = libE_info["executor"]
+            task = executor.submit(app_name="python",
+                                   #calc_type="sim",
+                                   app_args= self.wrapper_script + " " + sh_mem.name,
+                                   stdout="out.txt",
+                                   stderr="err.txt",
+            )
+
+            task.wait()  
+
+            logger.info("TASK STATUS:", task.success)
+            logger.info("STDERR:", task.read_stderr())
+            logger.info("STDOUT:", task.read_stdout())
+
+            # Read the data from shared memory
+            y = loads(sh_mem.buf) 
+            logger.info("y DETAILS:", type(y), y)
+
+            sh_mem.close()
+            sh_mem.unlink()
+
         H_o = np.zeros(2, dtype=sim_specs['out'])
         H_o['RUNTIME'] = y
         H_o['elapsed_sec'] = time.time() - self.start_time
@@ -172,15 +230,21 @@ class LibEnsembleAMBS(AMBS):
         super().__init__(learner=learner, liar_strategy=liar_strategy, acq_func=acq_func,
             set_KAPPA=set_KAPPA, set_SEED=set_SEED, set_NI=set_NI, initial_observations=initial_observations, evaluator=evaluator, **kwargs)
 
+        if "nworkers" not in libE_specs:
+            import mpi4py.MPI as MPI
+            libE_specs["nworkers"] = MPI.COMM_WORLD.Get_size() # Should be more portable. Not necessarily executing with MPI
 
-        self.libE_specs = libE_specs if libE_specs is not None else {}
+        #self.path_app_name_pairs = path_app_name_pairs
+        self.libE_specs = libE_specs
         #assert "nworkers" in libE_specs # For mpi, this can be set from the communicator
-        #assert 
-        import mpi4py.MPI as MPI
-        libE_specs["nworkers"] = MPI.COMM_WORLD.Get_size() # Should be more portable. Not necessarily executing with MPI
-        self.num_sim_workers = libE_specs["nworkers"] - 1
+        #self.num_sim_workers = libE_specs["nworkers"] - 1
         #self.is_manager = is_manager
         self.output_file_base = kwargs["output_file_base"] if "output_file_base" in kwargs else "./results"
+
+
+    @property
+    def num_sim_workers(self):
+        return self.libE_specs["nworkers"] - 1
 
 
     @staticmethod
@@ -235,9 +299,11 @@ class LibEnsembleAMBS(AMBS):
         import time
 
         # Import libEnsemble items for this test
-        from libensemble.libE import libE
+        #from libensemble.libE import libE
+        from libensemble import Ensemble
         from libensemble.alloc_funcs.start_only_persistent import only_persistent_gens as alloc_f
         from libensemble.tools import parse_args, save_libE_output, add_unique_random_streams
+        from libensemble.executors import Executor
 
         #from ytopt_obj import init_obj  # Simulator function, calls Plopper
         #from ytopt_asktell import persistent_ytopt  # Generator function, communicates with ytopt optimizer
@@ -324,15 +390,29 @@ class LibEnsembleAMBS(AMBS):
         # Added as a workaround to issue that's been resolved on develop
         persis_info = add_unique_random_streams({}, self.libE_specs["nworkers"] + 1)
 
+        # Register apps with executor. Doesn't need to be passed in as this creates a class variable which libE looks for.
+        executor = Executor()
+        #for path, app_name in self.path_app_name_pairs:
+
+        import sys
+        executor.register_app(full_path=sys.executable, app_name="python")#, calc_type="sim")
+
         # Perform the libE run
         print("STARTING libE", self.libE_specs)
 
-        H, persis_info, flag = libE(sim_specs, gen_specs, exit_criteria, persis_info,
-                                    alloc_specs=alloc_specs, libE_specs=self.libE_specs)
+        ensemble = Ensemble(sim_specs=sim_specs, gen_specs=gen_specs, exit_criteria=exit_criteria,
+                            persis_info=persis_info, alloc_specs=alloc_specs, libE_specs=self.libE_specs,
+                            executor=executor)
+        H, persis_info, flag = ensemble.run()
+
+        #H, persis_info, flag = libE(sim_specs, gen_specs, exit_criteria, persis_info,
+        #                            alloc_specs=alloc_specs, libE_specs=self.libE_specs)
+
 
         # Save History array to file
         #if self.is_manager:
-            #print("\nlibEnsemble has completed evaluations.")
+        #if ensemble.is_manager:
+        #    print("\nlibEnsemble has completed evaluations.")
             #save_libE_output(H, persis_info, __file__, nworkers)
 
             #print("\nSaving just sim_specs[['in','out']] to a CSV")
