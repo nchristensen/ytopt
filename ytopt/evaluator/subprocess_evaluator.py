@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class PopenFuture:
     FAIL_RETURN_VALUE = Evaluator.FAIL_RETURN_VALUE
+    TIMEOUT = 240
 
     def __init__(self, args, parse_fxn):
         self.proc = subprocess.Popen(args, shell=True, stdout=subprocess.PIPE,
@@ -37,8 +38,8 @@ class PopenFuture:
     def result(self):
         if self._result is not None:
             return self._result
-        self.proc.wait()
-        stdout, stderr_data = self.proc.communicate()
+        #self.proc.wait()
+        stdout, stderr_data = self.proc.communicate(timeout=self.TIMEOUT)
         if self.done:
             self._result = self._parse(stdout)
         else:
@@ -91,8 +92,8 @@ class SubprocessEvaluator(Evaluator):
     WaitResult = namedtuple(
         'WaitResult', ['active', 'done', 'failed', 'cancelled'])
 
-    def __init__(self, problem, cache_key=None):
-        super().__init__(problem, cache_key)
+    def __init__(self, problem, cache_key=None, output_file_base="results"):
+        super().__init__(problem, cache_key, output_file_base=output_file_base)
         self.num_workers = self.WORKERS_PER_NODE
         logger.info(
             f"Subprocess Evaluator will execute {self.problem.objective.__name__}() from module {self.problem.objective.__module__}")
