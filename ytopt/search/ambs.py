@@ -23,10 +23,6 @@ Arguments of AMBS :
     * ``gp_hedge`` : (default)
 """
 
-import mpi4py
-mpi4py.rc.initialize = False
-import mpi4py.MPI as MPI
-comm = MPI.COMM_WORLD
 
 import signal
 
@@ -176,6 +172,15 @@ class LibEnsembleTuningProblem(TuningProblem):
             # Need to send rank/worker id to executor
             # Should be more portable. Not necessarily executing with MPI
             # I imagine libensemble has some kind of worker id
+            import mpi4py
+            mpi4py.rc.initialize = False
+            import mpi4py.MPI as MPI
+            if not MPI.Is_initialized():
+                MPI.Init()
+
+            comm = MPI.COMM_WORLD
+
+
             worker_id = comm.Get_rank()
 
             pickled_data = dumps([self.objective, point, worker_id])
@@ -236,6 +241,14 @@ class LibEnsembleAMBS(AMBS):
             set_KAPPA=set_KAPPA, set_SEED=set_SEED, set_NI=set_NI, initial_observations=initial_observations, evaluator=evaluator, **kwargs)
 
         if "nworkers" not in libE_specs:
+            import mpi4py
+            mpi4py.rc.initialize = False
+            import mpi4py.MPI as MPI
+            if not MPI.Is_initialized():
+                MPI.Init()
+
+            comm = MPI.COMM_WORLD
+
             libE_specs["nworkers"] = comm.Get_size() # Should be more portable. Not necessarily executing with MPI
 
         #self.path_app_name_pairs = path_app_name_pairs
