@@ -147,7 +147,10 @@ class LibEnsembleTuningProblem(TuningProblem):
     def libE_objective(self, H, persis_info, sim_specs, libE_info):
         import numpy as np
         import time
-        
+        from libensemble.executors import Executor, MPIExecutor
+
+        executor = libE_info["executor"]
+ 
         if getattr(self, "start_time", None) is None:
             self.start_time = time.time()
 
@@ -157,6 +160,40 @@ class LibEnsembleTuningProblem(TuningProblem):
 
         if self.wrapper_script is None:
             y = self.objective(point)#, sim_specs['in'], libE_info['workerID'])  # ytopt objective wants a dict
+        elif isinstance(executor, MPIExecutor):
+            # Do something similar to below, but communicate via disk instead.
+            from pickle import dump, load
+            import secrets
+
+            filename = secrets.token_hex(nbytes=4) + ".pkl"
+
+            worker_id = 0
+            with open(filename, "xb") as file:
+                dump([self.objective, point, worker_id], file)
+                #file.flush()
+
+             # Run the script using the executor
+            task = executor.submit(app_name="python",
+                                   #calc_type="sim",
+                                   app_args= self.wrapper_script + " " + filename,
+                                   stdout="out.txt",
+                                   stderr="err.txt",
+            )
+            task.wait()  
+            logger.info("TASK STATUS:", task.success)
+            logger.info("STDERR:", task.read_stderr())
+            #logger.info("STDOUT:", task.read_stdout())
+
+            with open(filename, "rb") as file:
+                #file.seek(0)
+                y = load(file)
+            
+            logger.info("y DETAILS:", type(y), y)
+
+            # Cleanup the file
+            import os
+            os.remove(filename)
+
         else:
 
             # Allows for running the objective function in a separate python process to
@@ -164,36 +201,32 @@ class LibEnsembleTuningProblem(TuningProblem):
             # called script and the calling script through shared memory. The called script must accept the
             # shared memory name as its single argument.
 
-            from multiprocessing import shared_memory
             from pickle import dumps, loads
-            import feintune
-            import os
-
-            # Need to send rank/worker id to executor
-            # Should be more portable. Not necessarily executing with MPI
-            # I imagine libensemble has some kind of worker id
-            import mpi4py
-            mpi4py.rc.initialize = False
-            import mpi4py.MPI as MPI
-            if not MPI.Is_initialized():
-                MPI.Init()
-
-            comm = MPI.COMM_WORLD
+            from multiprocessing import shared_memory
 
 
-            worker_id = comm.Get_rank()
+            # MPI within MPI is not necessarily well supported.
+            if not isinstance(executor, MPIExecutor):
+                # Need to send rank/worker id to executor
+                # Should be more portable. Not necessarily executing with MPI
+                # I imagine libensemble has some kind of worker id
+                # ...or maybe this is what the resource sets are for.
+                import mpi4py
+                mpi4py.rc.initialize = False
+                import mpi4py.MPI as MPI
+
+                if not MPI.Is_initialized():
+                    MPI.Init()
+                comm = MPI.COMM_WORLD
+                worker_id = comm.Get_rank()
+            else:
+                worker_id = 0
 
             pickled_data = dumps([self.objective, point, worker_id])
-
             sh_mem = shared_memory.SharedMemory(create=True, size=len(pickled_data))
             sh_mem.buf[:] = pickled_data[:]
 
-            #dirname = os.path.dirname(feintune.__file__)
-            #f = os.path.join(dirname, "ytopt_autotuning.py")
-
-
             # Run the script using the executor
-            executor = libE_info["executor"]
             task = executor.submit(app_name="python",
                                    #calc_type="sim",
                                    app_args= self.wrapper_script + " " + sh_mem.name,
@@ -204,15 +237,15 @@ class LibEnsembleTuningProblem(TuningProblem):
             task.wait()  
 
             logger.info("TASK STATUS:", task.success)
-            logger.info("STDERR:", task.read_stderr())
-            logger.info("STDOUT:", task.read_stdout())
+            #logger.info("STDERR:", task.read_stderr())
+            #logger.info("STDOUT:", task.read_stdout())
 
             # Read the data from shared memory
             y = loads(sh_mem.buf) 
             logger.info("y DETAILS:", type(y), y)
 
-            sh_mem.close()
             sh_mem.unlink()
+            sh_mem.close()
 
         H_o = np.zeros(2, dtype=sim_specs['out'])
         H_o['RUNTIME'] = y
@@ -240,16 +273,22 @@ class LibEnsembleAMBS(AMBS):
         super().__init__(learner=learner, liar_strategy=liar_strategy, acq_func=acq_func,
             set_KAPPA=set_KAPPA, set_SEED=set_SEED, set_NI=set_NI, initial_observations=initial_observations, evaluator=evaluator, **kwargs)
 
+        if "comms" in libE_specs and libE_specs["comms"] == "local":
+            # Need to specify tne number of workers if local comms are used
+            assert "nworkers" in libE_specs
+
         if "nworkers" not in libE_specs:
+            # Currently assume we're using MPI if comms is not specified to be local
+            # Should probably check the command line arguments or something. Maybe
+            # can detect from libE_specs
             import mpi4py
             mpi4py.rc.initialize = False
             import mpi4py.MPI as MPI
             if not MPI.Is_initialized():
                 MPI.Init()
-
             comm = MPI.COMM_WORLD
 
-            libE_specs["nworkers"] = comm.Get_size() # Should be more portable. Not necessarily executing with MPI
+            libE_specs["nworkers"] = comm.Get_size()
 
         #self.path_app_name_pairs = path_app_name_pairs
         self.libE_specs = libE_specs
@@ -320,7 +359,7 @@ class LibEnsembleAMBS(AMBS):
         from libensemble import Ensemble
         from libensemble.alloc_funcs.start_only_persistent import only_persistent_gens as alloc_f
         from libensemble.tools import parse_args, save_libE_output, add_unique_random_streams
-        from libensemble.executors import Executor
+        from libensemble.executors import Executor, MPIExecutor
 
         #from ytopt_obj import init_obj  # Simulator function, calls Plopper
         #from ytopt_asktell import persistent_ytopt  # Generator function, communicates with ytopt optimizer
@@ -408,7 +447,10 @@ class LibEnsembleAMBS(AMBS):
         persis_info = add_unique_random_streams({}, self.libE_specs["nworkers"] + 1)
 
         # Register apps with executor. Doesn't need to be passed in as this creates a class variable which libE looks for.
-        executor = Executor()
+        if "comms" in self.libE_specs and self.libE_specs["comms"] == "local":
+            executor = MPIExecutor()
+        else:
+            executor = Executor()
         #for path, app_name in self.path_app_name_pairs:
 
         import sys
