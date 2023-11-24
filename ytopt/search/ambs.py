@@ -44,10 +44,16 @@ def on_exit(signum, stack):
 
 class AMBS(Search):
     def __init__(self, learner='RF', liar_strategy='cl_max', acq_func='gp_hedge',
-                 set_KAPPA=1.96, set_SEED=12345, set_NI=10, initial_observations=None, **kwargs):
+                 set_KAPPA=1.96, set_SEED=12345, set_NI=10, initial_observations=None, error_flag_val=None, **kwargs):
         super().__init__(**kwargs)
 
         logger.info("Initializing AMBS")
+
+        self.error_flag_val = error_flag_val
+        if initial_observations is not None:
+            initial_observations = self.forbid_invalid(initial_observations)
+
+
 
         self.optimizer = Optimizer(
             num_workers=self.num_workers,
@@ -95,6 +101,29 @@ class AMBS(Search):
                             )
         return parser
 
+
+    def forbid_invalid(self, results):
+        from ConfigSpace import ConfigurationSpace, ForbiddenEqualsClause, ForbiddenAndConjunction
+        if self.error_flag_val is not None and isinstance(self.problem.input_space, ConfigurationSpace):
+            valid_results = []
+            for result in results:
+                if result[1] == self.error_flag_val:
+                    # Forbid the point
+                    logger.info("Forbidding a point:", result[0])
+                    forbidden_clauses = [ForbiddenEqualsClause(self.problem.input_space[key], val) for key, val in result[0].items()]
+
+                    forbidden_conjunction = ForbiddenAndConjunction(*forbidden_clauses)
+                    self.problem.input_space.add_forbidden_clause(forbidden_conjunction)
+                    if hasattr(self, "optimizer"):
+                        print(self.optimizer.space)
+                        assert self.problem.input_space == self.optimizer.space
+                else:                   
+                    valid_results.append(result)
+            results = valid_results
+
+        return results
+
+
     def main(self):
 
         logger.info(f"Generating {self.num_workers} initial points...")
@@ -113,6 +142,9 @@ class AMBS(Search):
                 results = list(self.evaluator.get_finished_evals())
                 num_evals += len(results)
                 chkpoint_counter += len(results)
+
+                results = self._forbid_invalid(results)
+
                 if EXIT_FLAG or num_evals >= self.max_evals:
                     break
                 if results:
@@ -178,8 +210,16 @@ class LibEnsembleTuningProblem(TuningProblem):
                                    app_args= self.wrapper_script + " " + filename,
                                    stdout="out.txt",
                                    stderr="err.txt",
+                                   auto_assign_gpus=True,
+                                   match_procs_to_gpus=True
             )
-            task.wait()  
+
+            executor.polling_loop(task, timeout=self.objective.timeout)
+
+            from libensemble.tools.test_support import check_gpu_setting
+            check_gpu_setting(task, assert_setting=False, print_setting=True)
+
+            #task.wait()  
             logger.info("TASK STATUS:", task.success)
             logger.info("STDERR:", task.read_stderr())
             #logger.info("STDOUT:", task.read_stdout())
@@ -187,6 +227,11 @@ class LibEnsembleTuningProblem(TuningProblem):
             with open(filename, "rb") as file:
                 #file.seek(0)
                 y = load(file)
+
+            if y == "ERROR" or not task.success:
+                # This should probably be a property of the TuningProblem object rather
+                # than the objective function.
+                y = self.objective.error_return_time
             
             logger.info("y DETAILS:", type(y), y)
 
@@ -234,9 +279,12 @@ class LibEnsembleTuningProblem(TuningProblem):
                                    stderr="err.txt",
             )
 
-            task.wait()  
+            executor.polling_loop(task, timeout=self.objective.timeout)
+            #task.wait()  
 
             logger.info("TASK STATUS:", task.success)
+            if not task.success:
+                y = self.objective.error_return_time
             #logger.info("STDERR:", task.read_stderr())
             #logger.info("STDOUT:", task.read_stdout())
 
@@ -264,7 +312,7 @@ class LibEnsembleAMBS(AMBS):
 
         logger.info("STARTING LibEnsembleAMBS constructor")
 
-        print(kwargs, flush=True)
+        #print(kwargs, flush=True)
 
         # For some reason this deadlocks if an mpi_comm_executor is used here. It
         # shouldn't really matter what the evaluator is set to, since it isn't used anyway.
@@ -288,7 +336,7 @@ class LibEnsembleAMBS(AMBS):
                 MPI.Init()
             comm = MPI.COMM_WORLD
 
-            libE_specs["nworkers"] = comm.Get_size()
+            libE_specs["nworkers"] = comm.Get_size() - 1
 
         #self.path_app_name_pairs = path_app_name_pairs
         self.libE_specs = libE_specs
@@ -529,6 +577,7 @@ class LibEnsembleAMBS(AMBS):
                         field_params[field] = entry[field][0]
                     results += [(field_params, entry['RUNTIME'])]
                 print('results: ', results)
+                results = self.forbid_invalid(results)
                 ytoptimizer.tell(results)
 
                 ytopt_points = ytoptimizer.ask(n_points=batch_size)  # Returns a generator that we convert to a list
