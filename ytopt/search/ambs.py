@@ -221,7 +221,7 @@ class LibEnsembleTuningProblem(TuningProblem):
 
             #task.wait()  
             logger.info("TASK STATUS:", task.success)
-            logger.info("STDERR:", task.read_stderr())
+
             #logger.info("STDOUT:", task.read_stdout())
 
             with open(filename, "rb") as file:
@@ -231,6 +231,7 @@ class LibEnsembleTuningProblem(TuningProblem):
             if y == "ERROR" or not task.success:
                 # This should probably be a property of the TuningProblem object rather
                 # than the objective function.
+                logger.info("STDERR:", task.read_stderr())
                 y = self.objective.error_return_time
             
             logger.info("y DETAILS:", type(y), y)
