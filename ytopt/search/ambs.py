@@ -251,7 +251,7 @@ class LibEnsembleTuningProblem(TuningProblem):
 
 
             # MPI within MPI is not necessarily well supported.
-            if not isinstance(executor, MPIExecutor):
+            if False:#not isinstance(executor, MPIExecutor):
                 # Need to send rank/worker id to executor
                 # Should be more portable. Not necessarily executing with MPI
                 # I imagine libensemble has some kind of worker id
@@ -265,7 +265,9 @@ class LibEnsembleTuningProblem(TuningProblem):
                 comm = MPI.COMM_WORLD
                 worker_id = comm.Get_rank()
             else:
-                worker_id = 0
+                from libensemble.resources.resources import Resources
+                worker_id = Resources.resources.worker_resources.workerID
+                assert worker_id is not None
 
             pickled_data = dumps([self.objective, point, worker_id])
             sh_mem = shared_memory.SharedMemory(create=True, size=len(pickled_data))
