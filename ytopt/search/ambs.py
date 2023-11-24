@@ -143,7 +143,7 @@ class AMBS(Search):
                 num_evals += len(results)
                 chkpoint_counter += len(results)
 
-                results = self._forbid_invalid(results)
+                results = self.forbid_invalid(results)
 
                 if EXIT_FLAG or num_evals >= self.max_evals:
                     break
