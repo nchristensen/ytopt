@@ -216,11 +216,11 @@ class LibEnsembleTuningProblem(TuningProblem):
 
             executor.polling_loop(task, timeout=self.objective.timeout)
 
-            from libensemble.tools.test_support import check_gpu_setting
-            check_gpu_setting(task, assert_setting=False, print_setting=True)
+            #from libensemble.tools.test_support import check_gpu_setting
+            #check_gpu_setting(task, assert_setting=False, print_setting=True)
 
             #task.wait()  
-            logger.info("TASK STATUS:", task.success)
+            #logger.info("TASK STATUS:", task.success)
 
             #logger.info("STDOUT:", task.read_stdout())
 
@@ -231,10 +231,12 @@ class LibEnsembleTuningProblem(TuningProblem):
             if y == "ERROR" or not task.success:
                 # This should probably be a property of the TuningProblem object rather
                 # than the objective function.
+
+                logger.info("TASK STATUS:", task.success)
                 logger.info("STDERR:", task.read_stderr())
                 y = self.objective.error_return_time
             
-            logger.info("y DETAILS:", type(y), y)
+            #logger.info("y DETAILS:", type(y), y)
 
             # Cleanup the file
             import os
