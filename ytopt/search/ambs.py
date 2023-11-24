@@ -110,10 +110,15 @@ class AMBS(Search):
                 if result[1] == self.error_flag_val:
                     # Forbid the point
                     logger.info("Forbidding a point:", result[0])
-                    forbidden_clauses = [ForbiddenEqualsClause(self.problem.input_space[key], val) for key, val in result[0].items()]
 
-                    forbidden_conjunction = ForbiddenAndConjunction(*forbidden_clauses)
-                    self.problem.input_space.add_forbidden_clause(forbidden_conjunction)
+                    try:
+                        forbidden_clauses = [ForbiddenEqualsClause(self.problem.input_space[key], val) for key, val in result[0].items()]
+                        forbidden_conjunction = ForbiddenAndConjunction(*forbidden_clauses)
+                        self.problem.input_space.add_forbidden_clause(forbidden_conjunction)
+                    except ValueError as e:
+                        print(f"Forbidding point {result} was attemped, but failed due to a ValueError")
+                        print(e)
+                        
                     if hasattr(self, "optimizer"):
                         print(self.optimizer.space)
                         assert self.problem.input_space == self.optimizer.space
