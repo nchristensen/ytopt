@@ -44,12 +44,15 @@ def on_exit(signum, stack):
 
 class AMBS(Search):
     def __init__(self, learner='RF', liar_strategy='cl_max', acq_func='gp_hedge',
-                 set_KAPPA=1.96, set_SEED=12345, set_NI=10, initial_observations=None, error_flag_val=None, **kwargs):
+                 set_KAPPA=1.96, set_SEED=12345, set_NI=10, initial_observations=None, error_flag_val=None,
+                 environment_failure_flag=None, **kwargs):
         super().__init__(**kwargs)
 
         logger.info("Initializing AMBS")
 
         self.error_flag_val = error_flag_val
+        self.environment_failure_flag = environment_failure_flag
+
         if initial_observations is not None:
             initial_observations = self.forbid_invalid(initial_observations)
 
@@ -104,10 +107,10 @@ class AMBS(Search):
 
     def forbid_invalid(self, results):
         from ConfigSpace import ConfigurationSpace, ForbiddenEqualsClause, ForbiddenAndConjunction
-        if self.error_flag_val is not None and isinstance(self.problem.input_space, ConfigurationSpace):
+        if isinstance(self.problem.input_space, ConfigurationSpace):
             valid_results = []
             for result in results:
-                if result[1] == self.error_flag_val:
+                if self.error_flag_val is not None and result[1] == self.error_flag_val:
                     # Forbid the point
                     logger.info("Forbidding a point:", result[0])
 
@@ -122,6 +125,11 @@ class AMBS(Search):
                     if hasattr(self, "optimizer"):
                         print(self.optimizer.space)
                         assert self.problem.input_space == self.optimizer.space
+                elif self.environment_failure_flag is not None and result[1] == self.environment_failure_flag:
+                    # Run failed due to an error in the environment (e.g., no GPUs detected)
+                    # Not worthwhile to forbid the point
+                    pass
+
                 else:                   
                     valid_results.append(result)
             results = valid_results
