@@ -36,7 +36,7 @@ REQUIRED = [
     # nas
     #'gym',
     'deap',
-    'ray',
+    #'ray',
     #'ConfigSpace',
 ]
 
