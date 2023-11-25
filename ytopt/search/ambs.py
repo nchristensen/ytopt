@@ -205,27 +205,39 @@ class LibEnsembleTuningProblem(TuningProblem):
 
         if self.wrapper_script is None:
             y = self.objective(point)#, sim_specs['in'], libE_info['workerID'])  # ytopt objective wants a dict
-        elif isinstance(executor, MPIExecutor):
+        elif "disk" in self.wrapper_script:
             # Do something similar to below, but communicate via disk instead.
             from pickle import dump, load
             import secrets
 
             filename = secrets.token_hex(nbytes=4) + ".pkl"
 
-            worker_id = 0
+            from libensemble.resources.resources import Resources
+            worker_id = Resources.resources.worker_resources.workerID
+            assert worker_id is not None
+            logger.info(f"Worker {worker_id} submitting job to executor")
+
             with open(filename, "xb") as file:
                 dump([self.objective, point, worker_id], file)
                 #file.flush()
 
              # Run the script using the executor
-            task = executor.submit(app_name="python",
+            if isinstance(executor, MPIExecutor):
+                task = executor.submit(app_name="python",
                                    #calc_type="sim",
                                    app_args= self.wrapper_script + " " + filename,
                                    stdout="out.txt",
                                    stderr="err.txt",
                                    auto_assign_gpus=True,
                                    match_procs_to_gpus=True
-            )
+                )
+            else:
+                task = executor.submit(app_name="python",
+                                   #calc_type="sim",
+                                   app_args= self.wrapper_script + " " + filename,
+                                   stdout="out.txt",
+                                   stderr="err.txt"
+                )
 
             executor.polling_loop(task, timeout=self.objective.timeout)
 
@@ -256,7 +268,6 @@ class LibEnsembleTuningProblem(TuningProblem):
             os.remove(filename)
 
         else:
-
             # Allows for running the objective function in a separate python process to
             # protect the main process from crashes. Currently, all data is between the
             # called script and the calling script through shared memory. The called script must accept the
