@@ -54,7 +54,9 @@ class AMBS(Search):
         self.environment_failure_flag = environment_failure_flag
 
         if initial_observations is not None:
-            initial_observations = self.forbid_invalid(initial_observations)
+            # Sometimes the default point becomes forbidden, which
+            # breaks the tuner. filter_only is a workaround for that.
+            initial_observations = self.forbid_invalid(initial_observations, filter_only=True)
 
 
 
@@ -105,26 +107,29 @@ class AMBS(Search):
         return parser
 
 
-    def forbid_invalid(self, results):
+    def forbid_invalid(self, results, filter_only=False):
         from ConfigSpace import ConfigurationSpace, ForbiddenEqualsClause, ForbiddenAndConjunction
         if isinstance(self.problem.input_space, ConfigurationSpace):
             valid_results = []
             for result in results:
                 if self.error_flag_val is not None and result[1] == self.error_flag_val:
-                    # Forbid the point
-                    logger.info("Forbidding a point:", result[0])
+                    if filter_only:
+                        pass
+                    else:
+                        # Forbid the point
+                        logger.info("Forbidding a point:", result[0])
 
-                    try:
-                        forbidden_clauses = [ForbiddenEqualsClause(self.problem.input_space[key], val) for key, val in result[0].items()]
-                        forbidden_conjunction = ForbiddenAndConjunction(*forbidden_clauses)
-                        self.problem.input_space.add_forbidden_clause(forbidden_conjunction)
-                    except ValueError as e:
-                        print(f"Forbidding point {result} was attemped, but failed due to a ValueError")
-                        print(e)
-                        
-                    if hasattr(self, "optimizer"):
-                        print(self.optimizer.space)
-                        assert self.problem.input_space == self.optimizer.space
+                        try:
+                            forbidden_clauses = [ForbiddenEqualsClause(self.problem.input_space[key], val) for key, val in result[0].items()]
+                            forbidden_conjunction = ForbiddenAndConjunction(*forbidden_clauses)
+                            self.problem.input_space.add_forbidden_clause(forbidden_conjunction)
+                        except ValueError as e:
+                            print(f"Forbidding point {result} was attemped, but failed due to a ValueError")
+                            print(e)
+                            
+                        if hasattr(self, "optimizer"):
+                            print(self.optimizer.space)
+                            assert self.problem.input_space == self.optimizer.space
                 elif self.environment_failure_flag is not None and result[1] == self.environment_failure_flag:
                     # Run failed due to an error in the environment (e.g., no GPUs detected)
                     # Not worthwhile to forbid the point
