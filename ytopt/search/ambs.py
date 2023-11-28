@@ -546,6 +546,10 @@ class LibEnsembleAMBS(AMBS):
                             executor=executor)
         H, persis_info, flag = ensemble.run()
 
+        # Clean up the files after the run
+        ensemble_path = self.libE_specs['ensemble_dir_path']
+        from shutil import rmtree
+        rmtree(ensemble_path)
         #H, persis_info, flag = libE(sim_specs, gen_specs, exit_criteria, persis_info,
         #                            alloc_specs=alloc_specs, libE_specs=self.libE_specs)
 
