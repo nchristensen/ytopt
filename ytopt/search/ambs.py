@@ -549,7 +549,10 @@ class LibEnsembleAMBS(AMBS):
         # Clean up the files after the run
         ensemble_path = self.libE_specs['ensemble_dir_path']
         from shutil import rmtree
-        rmtree(ensemble_path)
+        try:
+            rmtree(ensemble_path)
+        except OSError as e:
+            print("Unable to delete all files")
         #H, persis_info, flag = libE(sim_specs, gen_specs, exit_criteria, persis_info,
         #                            alloc_specs=alloc_specs, libE_specs=self.libE_specs)
 
