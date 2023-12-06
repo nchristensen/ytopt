@@ -597,7 +597,11 @@ class LibEnsembleAMBS(AMBS):
         first_call = True
         first_write = True
         from os.path import exists
-        if exists("../../../" + self.output_file_base + '.csv'):
+
+        #workdir = "/ccs/home/njchris/Workspace/drivers_y3-prediction/smoke_test_ks_3d/"
+        workdir = "../../../"
+
+        if exists(workdir + self.output_file_base + '.csv'):
             first_write = False
 
         fields = [i[0] for i in gen_specs['out']]
@@ -648,7 +652,7 @@ class LibEnsembleAMBS(AMBS):
                                 b += [str(entry)]
 
      
-                        with open("../../../" + self.output_file_base + '.csv', 'a') as f:
+                        with open(workdir + self.output_file_base + '.csv', 'a') as f:
                         #with open('../../results.csv', 'a') as f:
                             if first_write:
                                 f.write(",".join(calc_in.dtype.names)+ "\n")
