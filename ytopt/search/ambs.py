@@ -627,29 +627,32 @@ class LibEnsembleAMBS(AMBS):
                 for key, value in entry.items():
                     H_o[i][key] = value
 
-            # This returns the requested points to the libE manager, which will
-            # perform the sim_f evaluations and then give back the values.
-            tag, Work, calc_in = ps.send_recv(H_o)
-            print('received:', calc_in, flush=True)
+            # Only perform the send_recv if H_o actually changed.
+            if not np.all(H_o == np.zeros(batch_size, dtype=gen_specs['out'])): 
 
-            if calc_in is not None:
-                if len(calc_in):
-                    b = []
-                    for entry in calc_in[0]:
-                        try: 
-                            b += [str(entry[0])]
-                        except: 
-                            b += [str(entry)]
+                # This returns the requested points to the libE manager, which will
+                # perform the sim_f evaluations and then give back the values.
+                tag, Work, calc_in = ps.send_recv(H_o)
+                print('received:', calc_in, flush=True)
 
- 
-                    with open("../../../" + self.output_file_base + '.csv', 'a') as f:
-                    #with open('../../results.csv', 'a') as f:
-                        if first_write:
-                            f.write(",".join(calc_in.dtype.names)+ "\n")
-                            f.write(",".join(b)+ "\n")
-                            first_write = False
-                        else:
-                            f.write(",".join(b)+ "\n")
+                if calc_in is not None:
+                    if len(calc_in):
+                        b = []
+                        for entry in calc_in[0]:
+                            try: 
+                                b += [str(entry[0])]
+                            except: 
+                                b += [str(entry)]
+
+     
+                        with open("../../../" + self.output_file_base + '.csv', 'a') as f:
+                        #with open('../../results.csv', 'a') as f:
+                            if first_write:
+                                f.write(",".join(calc_in.dtype.names)+ "\n")
+                                f.write(",".join(b)+ "\n")
+                                first_write = False
+                            else:
+                                f.write(",".join(b)+ "\n")
 
         return H_o, persis_info, FINISHED_PERSISTENT_GEN_TAG
         
