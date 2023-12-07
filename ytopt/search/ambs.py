@@ -134,7 +134,9 @@ class AMBS(Search):
                     # Run failed due to an error in the environment (e.g., no GPUs detected)
                     # Not worthwhile to forbid the point
                     pass
-
+                elif all([val == 0 for val in result[0].values()]):
+                    # Workaround for bug whereby all zeros are returned
+                    pass 
                 else:                   
                     valid_results.append(result)
             results = valid_results
@@ -598,8 +600,8 @@ class LibEnsembleAMBS(AMBS):
         first_write = True
         from os.path import exists
 
-        #workdir = "/ccs/home/njchris/Workspace/drivers_y3-prediction/smoke_test_ks_3d/"
-        workdir = "../../../"
+        workdir = "/ccs/home/njchris/Workspace/drivers_y3-prediction/smoke_test_ks_3d/"
+        #workdir = "../../../"
 
         if exists(workdir + self.output_file_base + '.csv'):
             first_write = False
