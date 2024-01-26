@@ -549,12 +549,13 @@ class LibEnsembleAMBS(AMBS):
         H, persis_info, flag = ensemble.run()
 
         # Clean up the files after the run
-        ensemble_path = self.libE_specs['ensemble_dir_path']
-        from shutil import rmtree
-        try:
-            rmtree(ensemble_path)
-        except OSError as e:
-            print("Unable to delete all files")
+        if True:
+            ensemble_path = self.libE_specs['ensemble_dir_path']
+            from shutil import rmtree
+            try:
+                rmtree(ensemble_path)
+            except OSError as e:
+                print("Unable to delete all files")
         #H, persis_info, flag = libE(sim_specs, gen_specs, exit_criteria, persis_info,
         #                            alloc_specs=alloc_specs, libE_specs=self.libE_specs)
 
@@ -595,13 +596,14 @@ class LibEnsembleAMBS(AMBS):
         ytoptimizer = user_specs['ytoptimizer']
 
         tag = None
-        calc_in = None
+        calc_in = []
         first_call = True
         first_write = True
+        deficit = 0
         from os.path import exists
 
-        workdir = "/ccs/home/njchris/Workspace/drivers_y3-prediction/smoke_test_ks_3d/"
-        #workdir = "../../../"
+        #workdir = "/ccs/home/njchris/Workspace/drivers_y3-prediction/smoke_test_ks_3d/"
+        workdir = "../../../"
 
         if exists(workdir + self.output_file_base + '.csv'):
             first_write = False
@@ -616,7 +618,7 @@ class LibEnsembleAMBS(AMBS):
                 batch_size = len(ytopt_points)
                 first_call = False
             else:
-                batch_size = len(calc_in)
+                batch_size = len(calc_in) + deficit
                 results = []
                 for entry in calc_in:
                     field_params = {}
@@ -631,23 +633,36 @@ class LibEnsembleAMBS(AMBS):
                 ytopt_points = list(ytopt_points)[0]
 
             # The hand-off of information from ytopt to libE is below. This hand-off may be brittle.
-            H_o = np.zeros(batch_size, dtype=gen_specs['out'])
+            print("ytopt_points")
+            print(ytopt_points)
+            #assert len(ytopt_points) == batch_size
+            deficit = batch_size - len(ytopt_points)
+            H_o = np.zeros(len(ytopt_points), dtype=gen_specs['out'])
             for i, entry in enumerate(ytopt_points):
                 for key, value in entry.items():
                     H_o[i][key] = value
 
-            # Only perform the send_recv if H_o actually changed.
-            if not np.all(H_o == np.zeros(batch_size, dtype=gen_specs['out'])): 
+            # If H_o is all zeros, just send an empty H_o
+            #if batch_size > 0 and np.all(H_o == np.zeros(batch_size, dtype=gen_specs['out'])):
+            #    calc_in_old = calc_in
+            #    H_o = np.zeros(0, dtype=gen_specs['out'])
+            #else:
+            #    calc_in_old = []
 
-                # This returns the requested points to the libE manager, which will
-                # perform the sim_f evaluations and then give back the values.
-                tag, Work, calc_in = ps.send_recv(H_o)
-                print('received:', calc_in, flush=True)
+            #if batch_size == 0 or (batch_size > 0 and not np.all(H_o == np.zeros(batch_size, dtype=gen_specs['out']))): 
 
-                if calc_in is not None:
-                    if len(calc_in):
+            # This returns the requested points to the libE manager, which will
+            # perform the sim_f evaluations and then give back the values.
+            print('sending:', H_o, flush=True)
+            tag, Work, calc_in = ps.send_recv(H_o)
+            print('received:', calc_in, flush=True)
+
+            # Should re-write this so it doesn't perform multiple writes.
+            if calc_in is not None:
+                if len(calc_in) > 0:
+                    for line in calc_in: # Fixes a massive bug in the prototype
                         b = []
-                        for entry in calc_in[0]:
+                        for entry in line:
                             try: 
                                 b += [str(entry[0])]
                             except: 
@@ -662,6 +677,11 @@ class LibEnsembleAMBS(AMBS):
                                 first_write = False
                             else:
                                 f.write(",".join(b)+ "\n")
+            else:
+                calc_in = []
+
+
+            #calc_in = calc_in + calc_in_old
 
         return H_o, persis_info, FINISHED_PERSISTENT_GEN_TAG
         
